@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import { getAnalysis } from "../api/client.js";
 import WarningModal from "../components/WarningModal.jsx";
 import ReportButton from "../components/ReportButton.jsx";
+import RiskGauge from "../components/RiskGauge.jsx";
 
 export default function ResultPage() {
   const { id } = useParams();
@@ -43,7 +44,7 @@ export default function ResultPage() {
 
       <div className="risk-score">
         <span>위험도</span>
-        <strong>{analysis.riskScore} / 100</strong>
+        <RiskGauge score={analysis.riskScore} />
       </div>
 
       <section className="xai-section">

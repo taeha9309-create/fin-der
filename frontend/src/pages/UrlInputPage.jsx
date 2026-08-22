@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { analyzeUrl } from "../api/client.js";
+import LoadingOverlay from "../components/LoadingOverlay.jsx";
 
 export default function UrlInputPage() {
   const [url, setUrl] = useState("");
@@ -41,6 +42,7 @@ export default function UrlInputPage() {
         </button>
       </form>
       {error && <p className="error-text">{error}</p>}
+      {loading && <LoadingOverlay />}
     </div>
   );
 }
