@@ -1,6 +1,8 @@
 package com.phishing.backend.exception;
 
 import com.phishing.backend.dto.ApiError;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -15,10 +17,27 @@ import java.util.concurrent.TimeoutException;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    @ExceptionHandler(AnalysisQueueFullException.class)
+    public ResponseEntity<ApiError> handleAnalysisQueueFull(
+            AnalysisQueueFullException exception
+    ) {
+        log.warn("Analysis queue is full");
+        return ResponseEntity
+                .status(HttpStatus.TOO_MANY_REQUESTS)
+                .body(new ApiError(
+                        "ANALYSIS_QUEUE_FULL",
+                        "분석 요청이 많습니다. 잠시 후 다시 시도해주세요."
+                ));
+    }
+
     @ExceptionHandler(WebClientResponseException.class)
     public ResponseEntity<String> handleSandboxResponse(
             WebClientResponseException exception
     ) {
+        log.warn("Sandbox returned an error: status={}, response={}",
+                exception.getStatusCode().value(), exception.getResponseBodyAsString());
         String responseBody = exception.getResponseBodyAsString();
 
         if (responseBody == null || responseBody.isBlank()) {
@@ -40,6 +59,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> handleSandboxConnection(
             WebClientRequestException exception
     ) {
+        log.error("Unable to connect to Sandbox", exception);
         return ResponseEntity
                 .status(HttpStatus.BAD_GATEWAY)
                 .body(new ApiError(
@@ -52,6 +72,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> handleTimeout(
             TimeoutException exception
     ) {
+        log.warn("Sandbox request timed out", exception);
         return ResponseEntity
                 .status(HttpStatus.GATEWAY_TIMEOUT)
                 .body(new ApiError(
@@ -73,6 +94,18 @@ public class GlobalExceptionHandler {
                 .body(new ApiError(
                         "INVALID_REQUEST",
                         message
+                ));
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ApiError> handleUnexpected(Exception exception) {
+        log.error("Unhandled backend error", exception);
+
+        return ResponseEntity
+                .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(new ApiError(
+                        "INTERNAL_ERROR",
+                        "요청 처리 중 내부 오류가 발생했습니다."
                 ));
     }
 }

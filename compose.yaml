@@ -39,6 +39,11 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3001
+      ANALYSIS_STORAGE_DIR: /data/analyses
+      ANALYSIS_RETENTION_HOURS: ${ANALYSIS_RETENTION_HOURS:-24}
+      CLEANUP_INTERVAL_MINUTES: ${CLEANUP_INTERVAL_MINUTES:-60}
+    volumes:
+      - analysis_data:/data/analyses
     mem_limit: 1g
     cpus: 1.0
     pids_limit: 256
@@ -54,6 +59,12 @@ services:
       - "8080:8080"
     environment:
       SANDBOX_BASE_URL: http://sandbox:3001
+      ANALYSIS_JOB_STORAGE_DIR: /data/jobs
+      MAX_CONCURRENT_ANALYSES: ${MAX_CONCURRENT_ANALYSES:-2}
+      MAX_QUEUED_ANALYSES: ${MAX_QUEUED_ANALYSES:-20}
+      SANDBOX_RETRY_COUNT: ${SANDBOX_RETRY_COUNT:-1}
+    volumes:
+      - analysis_job_data:/data/jobs
     depends_on:
       - sandbox
     mem_limit: 512m
@@ -64,3 +75,5 @@ services:
 
 volumes:
   database_data:
+  analysis_data:
+  analysis_job_data:

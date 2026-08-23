@@ -47,6 +47,13 @@ target/
 # Playwright
 playwright-report/
 test-results/
+sandbox/page.html
+sandbox/screenshot.png
+
+# Local analysis output
+analysis-data/
+job-data/
+*.job
 
 # Database
 *.db

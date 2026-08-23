@@ -3,3 +3,9 @@ server:
 
 sandbox:
   base-url: ${SANDBOX_BASE_URL:http://localhost:3001}
+
+analysis:
+  job-storage-dir: ${ANALYSIS_JOB_STORAGE_DIR:/data/jobs}
+  max-concurrent: ${MAX_CONCURRENT_ANALYSES:2}
+  max-queued: ${MAX_QUEUED_ANALYSES:20}
+  sandbox-retry-count: ${SANDBOX_RETRY_COUNT:1}

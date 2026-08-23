@@ -35,6 +35,20 @@ docker compose up --build
 현재는 팀 개발을 위한 기본 골격입니다. 각 서비스가 구현되면
 `compose.yaml`에 해당 컨테이너 설정을 추가합니다.
 
+Backend와 Sandbox의 요청·응답 규격은
+[Backend / Sandbox API](docs/backend-sandbox-api.md)에서 확인할 수 있습니다.
+
+## Backend/Sandbox smoke test
+
+Docker 서비스가 실행 중인 상태에서 프로젝트 루트의 PowerShell에서 실행합니다.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test.ps1
+```
+
+이 스크립트는 동기 분석, HTML·Text·Screenshot 저장, Redirect 결과,
+비동기 Job 완료, Job 파일 영속화, 내부 주소 차단 및 404 응답을 자동으로 확인합니다.
+
 ## 1차 탐지 코드 이전
 
 기존 XGBoost/SHAP 코드는 `ml-service/` 아래에 배치합니다. 권장 구조는 다음과 같습니다.
