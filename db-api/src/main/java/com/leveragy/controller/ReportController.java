@@ -1,6 +1,7 @@
 package com.leveragy.controller;
 
 import com.leveragy.dto.ReportRequest;
+import com.leveragy.dto.UpdateReportStatusRequest;
 import com.leveragy.entity.Report;
 import com.leveragy.repository.ReportRepository;
 import org.springframework.http.ResponseEntity;
@@ -29,7 +30,25 @@ public class ReportController {
     }
 
     @GetMapping
-    public ResponseEntity<List<Report>> listReports() {
-        return ResponseEntity.ok(reportRepository.findAll());
+    public ResponseEntity<List<Report>> listReports(
+            @RequestParam(required = false) String status
+    ) {
+        List<Report> reports = status == null
+                ? reportRepository.findAllByOrderByCreatedAtDesc()
+                : reportRepository.findAllByStatusOrderByCreatedAtDesc(status);
+        return ResponseEntity.ok(reports);
+    }
+
+    @PatchMapping("/{id}")
+    public ResponseEntity<Report> updateStatus(
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateReportStatusRequest request
+    ) {
+        return reportRepository.findById(id)
+                .map(report -> {
+                    report.setStatus(request.getStatus());
+                    return ResponseEntity.ok(reportRepository.save(report));
+                })
+                .orElse(ResponseEntity.notFound().build());
     }
 }

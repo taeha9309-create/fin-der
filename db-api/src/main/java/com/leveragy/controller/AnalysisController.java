@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import javax.validation.Valid;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/analyze")
@@ -25,6 +26,11 @@ public class AnalysisController {
     public ResponseEntity<UrlAnalysis> analyze(@Valid @RequestBody AnalyzeRequest request) {
         UrlAnalysis result = analysisService.analyze(request);
         return ResponseEntity.ok(result);
+    }
+
+    @GetMapping
+    public ResponseEntity<List<UrlAnalysis>> listAnalyses() {
+        return ResponseEntity.ok(urlAnalysisRepository.findAllByOrderByCreatedAtDesc());
     }
 
     @GetMapping("/{id}")
