@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { getAnalysis } from "../api/client.js";
 import WarningModal from "../components/WarningModal.jsx";
 import ReportButton from "../components/ReportButton.jsx";
 import RiskGauge from "../components/RiskGauge.jsx";
+import ErrorState from "../components/ErrorState.jsx";
 
 export default function ResultPage() {
   const { id } = useParams();
@@ -11,7 +12,9 @@ export default function ResultPage() {
   const [error, setError] = useState("");
   const [blocked, setBlocked] = useState(true);
 
-  useEffect(() => {
+  const loadAnalysis = useCallback(() => {
+    setError("");
+    setAnalysis(null);
     getAnalysis(id)
       .then((data) => {
         setAnalysis(data);
@@ -20,7 +23,11 @@ export default function ResultPage() {
       .catch(() => setError("분석 결과를 불러오지 못했습니다."));
   }, [id]);
 
-  if (error) return <div className="page">{error}</div>;
+  useEffect(() => {
+    loadAnalysis();
+  }, [loadAnalysis]);
+
+  if (error) return <div className="page"><ErrorState message={error} onRetry={loadAnalysis} /></div>;
   if (!analysis) return <div className="page">불러오는 중...</div>;
 
   const reasons = safeParseReasons(analysis.xaiResult);
@@ -49,11 +56,15 @@ export default function ResultPage() {
 
       <section className="xai-section">
         <h2>판단 근거 (XAI)</h2>
-        <ul>
-          {reasons.map((reason, idx) => (
-            <li key={idx}>{formatReason(reason)}</li>
-          ))}
-        </ul>
+        {reasons.length === 0 ? (
+          <p className="empty-text">판단 근거 정보가 없습니다.</p>
+        ) : (
+          <ul>
+            {reasons.map((reason, idx) => (
+              <li key={idx}>{formatReason(reason)}</li>
+            ))}
+          </ul>
+        )}
       </section>
 
       <ReportButton url={analysis.url} />

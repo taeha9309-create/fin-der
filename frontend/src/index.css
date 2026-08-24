@@ -71,6 +71,7 @@ body {
   border: none;
   font-size: 1rem;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .btn-primary {
@@ -375,4 +376,133 @@ body {
   gap: 8px;
   margin-top: 12px;
   flex-wrap: wrap;
+}
+
+/* 모바일: 좁은 화면에서 폼/헤더/목록이 눌려서 글자가 잘리지 않도록 쌓기 */
+@media (max-width: 480px) {
+  .page {
+    padding: 24px 16px;
+  }
+
+  .url-form {
+    flex-direction: column;
+  }
+
+  .url-form .btn {
+    width: 100%;
+  }
+
+  .app-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .history-link {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .history-url {
+    max-width: 100%;
+  }
+
+  .modal {
+    padding: 24px;
+  }
+
+  .modal-actions {
+    flex-direction: column;
+  }
+
+  .modal-actions .btn {
+    width: 100%;
+  }
+}
+
+.error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 32px 16px;
+  text-align: center;
+  color: #555;
+}
+
+.error-state-icon {
+  font-size: 1.75rem;
+}
+
+.empty-text {
+  color: #888;
+  padding: 16px 0;
+}
+
+.not-found-page {
+  text-align: center;
+}
+
+.not-found-page h1 {
+  font-size: 3rem;
+  margin-bottom: 0;
+}
+
+.admin-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.admin-filter-tabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.admin-filter-tab {
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid #ccc;
+  background: #fff;
+  color: #555;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.admin-filter-tab.active {
+  background: #4361ee;
+  border-color: #4361ee;
+  color: #fff;
+}
+
+.admin-search {
+  padding: 8px 12px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  min-width: 200px;
+}
+
+.report-quick-reasons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.report-chip {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid #4361ee;
+  background: #fff;
+  color: #4361ee;
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
+.report-chip:hover {
+  background: #eef1ff;
 }

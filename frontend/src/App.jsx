@@ -4,6 +4,7 @@ import ResultPage from "./pages/ResultPage.jsx";
 import HistoryPage from "./pages/HistoryPage.jsx";
 import AdminPage from "./pages/AdminPage.jsx";
 import ThreatIntelPage from "./pages/ThreatIntelPage.jsx";
+import NotFoundPage from "./pages/NotFoundPage.jsx";
 
 export default function App() {
   return (
@@ -25,6 +26,7 @@ export default function App() {
           <Route path="/history" element={<HistoryPage />} />
           <Route path="/threat-intel" element={<ThreatIntelPage />} />
           <Route path="/admin" element={<AdminPage />} />
+          <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </main>
     </div>
