@@ -6,7 +6,11 @@ import java.time.Instant;
 public record AnalysisJobResponse(
         String analysisId,
         AnalysisStatus status,
-        SandboxResponse result,
+        UrlAnalysisResponse urlAnalysis,
+        SandboxResultSummary result,
+        PageAnalysisResponse pageAnalysis,
+        FinalAnalysisResponse finalAnalysis,
+        String failedStage,
         String errorCode,
         String errorMessage,
         Instant createdAt,

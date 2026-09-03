@@ -21,6 +21,8 @@
 | `sandbox/` | Playwright 및 Chromium 격리 분석 |
 | `ml-service/` | XGBoost, SHAP, 금융기관 도메인 규칙 기반 1차 분석 |
 | `multimodal-service/` | 스크린샷 및 HTML 기반 2차 분석 |
+| `page-ai-mock/` | Backend와 2차 페이지 AI 사이의 연동 검증용 모의 서비스 |
+| `url-ai-mock/` | Backend와 1차 URL AI 사이의 연동 검증용 모의 서비스 |
 | `database/` | SQL 스키마와 마이그레이션 |
 | `docs/` | 아키텍처와 API 문서 |
 | `scripts/` | 실행 및 통합 테스트 스크립트 |
@@ -47,7 +49,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test.ps1
 ```
 
 이 스크립트는 동기 분석, HTML·Text·Screenshot 저장, Redirect 결과,
-비동기 Job 완료, Job 파일 영속화, 내부 주소 차단 및 404 응답을 자동으로 확인합니다.
+비동기 Job 완료, Job 파일 영속화, 페이지 AI 실패 시 중간 결과 보존,
+내부 주소 차단 및 404 응답을 자동으로 확인합니다.
 
 ## 1차 탐지 코드 이전
 

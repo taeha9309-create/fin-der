@@ -11,6 +11,8 @@ const PORT = 3001;
 const MAX_HTML_BYTES = 2 * 1024 * 1024;
 const MAX_TEXT_BYTES = 1 * 1024 * 1024;
 const MAX_SCREENSHOT_BYTES = 10 * 1024 * 1024;
+const MAX_NETWORK_REQUESTS = 500;
+const MAX_DOM_ITEMS = 200;
 const ANALYSIS_TIMEOUT_MS = 30000;
 const ANALYSIS_STORAGE_DIR = process.env.ANALYSIS_STORAGE_DIR || "/data/analyses";
 const ANALYSIS_RETENTION_HOURS = Number.parseInt(
@@ -47,6 +49,27 @@ function urlForLog(value) {
     return parsed.toString();
   } catch {
     return "INVALID_URL";
+  }
+}
+
+function sanitizeCollectedUrl(value) {
+  try {
+    const parsed = new URL(value);
+    parsed.username = "";
+    parsed.password = "";
+    parsed.search = "";
+    parsed.hash = "";
+    return parsed.toString().slice(0, 2048);
+  } catch {
+    return null;
+  }
+}
+
+function hostnameOf(value) {
+  try {
+    return new URL(value).hostname.toLowerCase();
+  } catch {
+    return null;
   }
 }
 
@@ -133,7 +156,9 @@ app.post("/analyze", async (req, res) => {
       durationMs: Date.now() - startedAt,
     });
     return res.status(400).json({
+      schemaVersion: "1.0",
       analysisId,
+      collectionStatus: "FAILED",
       code: "INVALID_ANALYSIS_ID",
       message: "analysisId 형식이 올바르지 않습니다.",
     });
@@ -146,7 +171,9 @@ app.post("/analyze", async (req, res) => {
       durationMs: Date.now() - startedAt,
     });
     return res.status(400).json({
+      schemaVersion: "1.0",
       analysisId,
+      collectionStatus: "FAILED",
       code: "URL_REQUIRED",
       message: "url을 입력해주세요.",
     });
@@ -164,7 +191,9 @@ app.post("/analyze", async (req, res) => {
       durationMs: Date.now() - startedAt,
     });
     return res.status(400).json({
+      schemaVersion: "1.0",
       analysisId,
+      collectionStatus: "FAILED",
       code: error.code || "URL_VALIDATION_FAILED",
       message: error.message,
     });
@@ -231,6 +260,30 @@ app.post("/analyze", async (req, res) => {
     });
 
     const page = await context.newPage();
+    const networkRequests = [];
+    let networkRequestsTruncated = false;
+    let downloadDetected = false;
+
+    page.on("request", (request) => {
+      if (networkRequests.length >= MAX_NETWORK_REQUESTS) {
+        networkRequestsTruncated = true;
+        return;
+      }
+
+      const requestUrl = sanitizeCollectedUrl(request.url());
+
+      if (!requestUrl) {
+        return;
+      }
+
+      networkRequests.push({
+        url: requestUrl,
+        domain: hostnameOf(requestUrl),
+        method: request.method(),
+        resourceType: request.resourceType(),
+        hasPostData: request.postData() != null,
+      });
+    });
 
     page.on("popup", async (popup) => {
       logEvent("WARN", "popup_blocked", {
@@ -241,6 +294,7 @@ app.post("/analyze", async (req, res) => {
     });
 
     page.on("download", async (download) => {
+      downloadDetected = true;
       logEvent("WARN", "download_blocked", { analysisId });
       await download.cancel().catch(() => {});
     });
@@ -272,19 +326,106 @@ app.post("/analyze", async (req, res) => {
     let navigationRequest = response?.request() ?? null;
 
     while (navigationRequest) {
-      redirectChain.unshift(navigationRequest.url());
+      const navigationResponse = await navigationRequest.response();
+      redirectChain.unshift({
+        url: sanitizeCollectedUrl(navigationRequest.url()),
+        statusCode: navigationResponse?.status() ?? null,
+      });
       navigationRequest = navigationRequest.redirectedFrom();
     }
 
     if (redirectChain.length === 0) {
-      redirectChain.push(validatedUrl);
+      redirectChain.push({
+        url: sanitizeCollectedUrl(validatedUrl),
+        statusCode: response?.status() ?? null,
+      });
     }
 
     const finalUrl = page.url();
 
-    if (redirectChain.at(-1) !== finalUrl) {
-      redirectChain.push(finalUrl);
+    if (redirectChain.at(-1)?.url !== sanitizeCollectedUrl(finalUrl)) {
+      redirectChain.push({
+        url: sanitizeCollectedUrl(finalUrl),
+        statusCode: response?.status() ?? null,
+      });
     }
+
+    const domMetadata = await page.evaluate(({ maxItems }) => {
+      const normalized = (value, maxLength = 500) =>
+        String(value || "").replace(/\s+/g, " ").trim().slice(0, maxLength);
+      const isVisible = (element) => {
+        const style = window.getComputedStyle(element);
+        const rect = element.getBoundingClientRect();
+        return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
+      };
+      const labelFor = (input) => {
+        if (input.labels?.length) {
+          return normalized(Array.from(input.labels).map((label) => label.innerText).join(" "));
+        }
+        return normalized(input.getAttribute("aria-label") || input.closest("label")?.innerText || "");
+      };
+      const absoluteUrl = (value) => {
+        try {
+          const url = new URL(value || "", document.baseURI);
+          url.username = "";
+          url.password = "";
+          url.search = "";
+          url.hash = "";
+          return url.href.slice(0, 2048);
+        } catch {
+          return null;
+        }
+      };
+
+      const inputs = Array.from(document.querySelectorAll("input, textarea, select"))
+        .slice(0, maxItems)
+        .map((input) => ({
+          tagName: input.tagName.toLowerCase(),
+          type: normalized(input.getAttribute("type") || input.tagName.toLowerCase(), 50).toLowerCase(),
+          name: normalized(input.getAttribute("name"), 200),
+          id: normalized(input.id, 200),
+          placeholder: normalized(input.getAttribute("placeholder"), 300),
+          autocomplete: normalized(input.getAttribute("autocomplete"), 100),
+          required: input.required === true,
+          visible: isVisible(input),
+          label: labelFor(input),
+        }));
+
+      const forms = Array.from(document.forms)
+        .slice(0, maxItems)
+        .map((form) => {
+          const action = absoluteUrl(form.getAttribute("action") || document.location.href);
+          let actionDomain = null;
+          try { actionDomain = action ? new URL(action).hostname.toLowerCase() : null; } catch {}
+          return {
+            method: normalized(form.method || "GET", 20).toUpperCase(),
+            action,
+            actionDomain,
+            inputTypes: Array.from(form.querySelectorAll("input, textarea, select"))
+              .slice(0, 50)
+              .map((input) => normalized(input.getAttribute("type") || input.tagName, 50).toLowerCase()),
+          };
+        });
+
+      const links = Array.from(document.querySelectorAll("a[href]"))
+        .slice(0, maxItems)
+        .map((link) => ({
+          text: normalized(link.innerText || link.getAttribute("aria-label"), 300),
+          href: absoluteUrl(link.getAttribute("href")),
+        }))
+        .filter((link) => link.href);
+
+      return {
+        inputs,
+        forms,
+        links,
+        truncated: {
+          inputs: document.querySelectorAll("input, textarea, select").length > maxItems,
+          forms: document.forms.length > maxItems,
+          links: document.querySelectorAll("a[href]").length > maxItems,
+        },
+      };
+    }, { maxItems: MAX_DOM_ITEMS });
 
     const html = await page.content();
 
@@ -346,7 +487,9 @@ app.post("/analyze", async (req, res) => {
         metadataPath,
         JSON.stringify(
           {
+            schemaVersion: "1.0",
             analysisId,
+            collectionStatus: "COMPLETED",
             requestedUrl: validatedUrl,
             finalUrl,
             redirectChain,
@@ -355,6 +498,15 @@ app.post("/analyze", async (req, res) => {
             htmlSizeBytes: htmlSize,
             textSizeBytes: textSize,
             screenshotSizeBytes: screenshot.length,
+            inputs: domMetadata.inputs,
+            forms: domMetadata.forms,
+            links: domMetadata.links,
+            domMetadataTruncated: domMetadata.truncated,
+            network: {
+              requests: networkRequests,
+              requestsTruncated: networkRequestsTruncated,
+              downloadDetected,
+            },
             createdAt: new Date().toISOString(),
           },
           null,
@@ -375,7 +527,9 @@ app.post("/analyze", async (req, res) => {
     });
 
     return res.json({
+      schemaVersion: "1.0",
       analysisId,
+      collectionStatus: "COMPLETED",
       requestedUrl: validatedUrl,
       finalUrl,
       redirectChain,
@@ -390,6 +544,15 @@ app.post("/analyze", async (req, res) => {
       htmlPath,
       textPath,
       screenshotPath,
+      inputs: domMetadata.inputs,
+      forms: domMetadata.forms,
+      links: domMetadata.links,
+      domMetadataTruncated: domMetadata.truncated,
+      network: {
+        requests: networkRequests,
+        requestsTruncated: networkRequestsTruncated,
+        downloadDetected,
+      },
       loadTimeMs,
       error: null,
     });
@@ -429,7 +592,13 @@ app.post("/analyze", async (req, res) => {
       errorName: error.name,
     });
 
-    return res.status(status).json({ analysisId, code, message });
+    return res.status(status).json({
+      schemaVersion: "1.0",
+      analysisId,
+      collectionStatus: "FAILED",
+      code,
+      message,
+    });
 } finally {
     if (analysisTimer) {
       clearTimeout(analysisTimer);
@@ -468,7 +637,13 @@ app.use((error, req, res, next) => {
     errorName: error.name,
   });
 
-  return res.status(status).json({ analysisId, code, message });
+  return res.status(status).json({
+    schemaVersion: "1.0",
+    analysisId,
+    collectionStatus: "FAILED",
+    code,
+    message,
+  });
 });
 
 async function startServer() {

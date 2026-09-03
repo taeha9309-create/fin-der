@@ -13,6 +13,8 @@ import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
@@ -95,6 +97,35 @@ public class FileAnalysisJobStore implements AnalysisJobStore {
         } catch (IOException | ClassNotFoundException exception) {
             log.error("Job file read failed: analysisId={}", analysisId, exception);
             return Optional.empty();
+        }
+    }
+
+    @Override
+    public synchronized List<AnalysisJobResponse> findAll() {
+        List<AnalysisJobResponse> jobs = new ArrayList<>();
+
+        try (var paths = Files.list(storageDirectory)) {
+            paths.filter(path -> path.getFileName().toString().endsWith(".job"))
+                    .forEach(path -> {
+                        String fileName = path.getFileName().toString();
+                        String analysisId = fileName.substring(0, fileName.length() - 4);
+                        find(analysisId).ifPresent(jobs::add);
+                    });
+        } catch (IOException exception) {
+            log.error("Job storage directory scan failed", exception);
+        }
+
+        return List.copyOf(jobs);
+    }
+
+    @Override
+    public synchronized void delete(String analysisId) {
+        validateAnalysisId(analysisId);
+
+        try {
+            Files.deleteIfExists(resolveJobPath(analysisId));
+        } catch (IOException exception) {
+            throw new IllegalStateException("분석 Job 파일을 삭제할 수 없습니다.", exception);
         }
     }
 

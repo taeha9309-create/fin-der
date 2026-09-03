@@ -1,10 +1,10 @@
 package com.phishing.backend.dto;
 
+import java.io.Serializable;
 import java.util.List;
 import java.util.Map;
-import java.io.Serializable;
 
-public record SandboxResponse(
+public record SandboxResultSummary(
         String schemaVersion,
         String analysisId,
         String collectionStatus,
@@ -13,21 +13,17 @@ public record SandboxResponse(
         List<Map<String, Object>> redirectChain,
         Integer statusCode,
         String title,
-        String html,
         Integer htmlSizeBytes,
         String text,
         Integer textSizeBytes,
-        String screenshotBase64,
         Integer screenshotSizeBytes,
-        String htmlPath,
-        String textPath,
-        String screenshotPath,
         List<Map<String, Object>> inputs,
         List<Map<String, Object>> forms,
         List<Map<String, Object>> links,
         Map<String, Object> domMetadataTruncated,
         Map<String, Object> network,
         Long loadTimeMs,
+        ArtifactLinks artifacts,
         String error
 ) implements Serializable {
 }

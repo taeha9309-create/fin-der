@@ -24,4 +24,29 @@ public class WebClientConfig {
                 .exchangeStrategies(strategies)
                 .build();
     }
+
+    @Bean
+    public WebClient pageAnalysisWebClient(
+            @Value("${page-analysis.base-url}") String pageAnalysisBaseUrl
+    ) {
+        ExchangeStrategies strategies = ExchangeStrategies.builder()
+                .codecs(configurer ->
+                        configurer.defaultCodecs().maxInMemorySize(30 * 1024 * 1024)
+                )
+                .build();
+
+        return WebClient.builder()
+                .baseUrl(pageAnalysisBaseUrl)
+                .exchangeStrategies(strategies)
+                .build();
+    }
+
+    @Bean
+    public WebClient urlAnalysisWebClient(
+            @Value("${url-analysis.base-url}") String urlAnalysisBaseUrl
+    ) {
+        return WebClient.builder()
+                .baseUrl(urlAnalysisBaseUrl)
+                .build();
+    }
 }
