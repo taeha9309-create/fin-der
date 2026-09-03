@@ -8,6 +8,7 @@ import com.phishing.backend.dto.MlServiceResponse;
 import com.phishing.backend.dto.MultimodalRequest;
 import com.phishing.backend.dto.MultimodalResponse;
 import com.phishing.backend.dto.SandboxResponse;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
@@ -34,9 +35,9 @@ public class AnalysisOrchestrator {
     private final ObjectMapper objectMapper;
 
     public AnalysisOrchestrator(
-            WebClient mlServiceWebClient,
-            WebClient dbApiWebClient,
-            WebClient multimodalWebClient,
+            @Qualifier("mlServiceWebClient") WebClient mlServiceWebClient,
+            @Qualifier("dbApiWebClient") WebClient dbApiWebClient,
+            @Qualifier("multimodalWebClient") WebClient multimodalWebClient,
             SandboxService sandboxService,
             ObjectMapper objectMapper
     ) {

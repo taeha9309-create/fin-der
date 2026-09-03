@@ -1,7 +1,9 @@
 package com.phishing.backend.service;
 
 import com.phishing.backend.dto.AnalyzeRequest;
+import com.phishing.backend.dto.SandboxAnalyzeRequest;
 import com.phishing.backend.dto.SandboxResponse;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
@@ -13,14 +15,18 @@ public class SandboxService {
 
     private final WebClient sandboxWebClient;
 
-    public SandboxService(WebClient sandboxWebClient) {
+    public SandboxService(@Qualifier("sandboxWebClient") WebClient sandboxWebClient) {
         this.sandboxWebClient = sandboxWebClient;
     }
 
     public Mono<SandboxResponse> analyze(AnalyzeRequest request) {
+        return analyze(request.url(), null);
+    }
+
+    public Mono<SandboxResponse> analyze(String url, String analysisId) {
         return sandboxWebClient.post()
                 .uri("/analyze")
-                .bodyValue(request)
+                .bodyValue(new SandboxAnalyzeRequest(url, analysisId))
                 .retrieve()
                 .bodyToMono(SandboxResponse.class)
                 .timeout(Duration.ofSeconds(35));

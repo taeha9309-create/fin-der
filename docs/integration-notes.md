@@ -25,7 +25,7 @@
 이제 실제 파이프라인으로 연결:
 
 ```
-frontend → backend(오케스트레이터) → ml-service(XGBoost) 
+frontend → backend(오케스트레이터) → ml-service(XGBoost)
                                     → sandbox(Playwright, 필요시)
                                     → multimodal-service(Gemini, 필요시)
                                     → db-api(MySQL 저장)

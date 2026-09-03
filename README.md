@@ -6,7 +6,25 @@
 
 Gemini가 설정되지 않았거나 일시적으로 실패해도 backend는 Sandbox/ML 결과를 DB에 저장합니다. ML과 멀티모달 결과를 결합하는 현재 OR 규칙은 임시 통합 규칙이며 최종 정책이 아닙니다.
 
-## 서비스와 포트
+## 프로젝트 구성
+
+### 디렉터리 구성
+
+| 경로 | 역할 |
+| --- | --- |
+| `frontend/` | React 사용자 화면 |
+| `backend/` | Spring Boot 오케스트레이터 (Sandbox 호출) |
+| `db-api/` | Spring Boot, MySQL 저장/조회 API (`/api/analyze`, `/api/reports`) — `backend/`와 역할 정리 필요, 논의 중 |
+| `sandbox/` | Playwright 및 Chromium 격리 분석 |
+| `ml-service/` | XGBoost, SHAP, 금융기관 도메인 규칙 기반 1차 분석 |
+| `multimodal-service/` | 스크린샷 및 HTML 기반 2차 분석 |
+| `page-ai-mock/` | Backend와 2차 페이지 AI 사이의 연동 검증용 모의 서비스 |
+| `url-ai-mock/` | Backend와 1차 URL AI 사이의 연동 검증용 모의 서비스 |
+| `database/` | SQL 스키마와 마이그레이션 |
+| `docs/` | 아키텍처와 API 문서 |
+| `scripts/` | 실행 및 통합 테스트 스크립트 |
+
+### 기본 포트
 
 | 서비스 | 호스트 포트 | 컨테이너 포트 |
 | --- | ---: | ---: |
@@ -34,6 +52,21 @@ powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test.ps1
 ```
 
 `.env`와 모델 artifact는 `.gitignore` 대상입니다. 키가 없으면 멀티모달 API는 가짜 결과를 만들지 않고 503을 반환하며, 전체 분석 요청은 ML 결과로 완료됩니다.
+
+Backend와 Sandbox의 요청·응답 규격은
+[Backend / Sandbox API](docs/backend-sandbox-api.md)에서 확인할 수 있습니다.
+
+## Backend/Sandbox smoke test
+
+Docker 서비스가 실행 중인 상태에서 프로젝트 루트의 PowerShell에서 실행합니다.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test.ps1
+```
+
+이 스크립트는 실제 ML·Sandbox·멀티모달·DB 통합 분석, HTML·Text·Screenshot
+저장과 조회, 비동기 Job 완료와 영속화, 페이지 AI 실패 시 중간 결과 보존,
+내부 주소 차단, Gemini 미설정 대체 응답, 사용자 제보 및 404 응답을 자동으로 확인합니다.
 
 종료:
 

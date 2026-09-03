@@ -3,6 +3,22 @@ server:
 
 sandbox:
   base-url: ${SANDBOX_BASE_URL:http://localhost:3001}
+  artifact-storage-dir: ${ANALYSIS_ARTIFACT_STORAGE_DIR:/data/analyses}
+
+page-analysis:
+  base-url: ${PAGE_ANALYSIS_BASE_URL:http://localhost:8002}
+
+url-analysis:
+  base-url: ${URL_ANALYSIS_BASE_URL:http://localhost:8001}
+
+analysis:
+  job-storage-dir: ${ANALYSIS_JOB_STORAGE_DIR:/data/jobs}
+  max-concurrent: ${MAX_CONCURRENT_ANALYSES:2}
+  max-queued: ${MAX_QUEUED_ANALYSES:20}
+  sandbox-retry-count: ${SANDBOX_RETRY_COUNT:1}
+  timeout-seconds: ${ANALYSIS_TIMEOUT_SECONDS:90}
+  job-retention-hours: ${ANALYSIS_JOB_RETENTION_HOURS:24}
+  job-cleanup-interval-ms: ${ANALYSIS_JOB_CLEANUP_INTERVAL_MS:3600000}
 
 ml-service:
   base-url: ${ML_SERVICE_BASE_URL:http://localhost:8001}
