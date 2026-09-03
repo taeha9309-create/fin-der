@@ -72,3 +72,7 @@ python -m src.train --data data/processed/train.csv --eval-data data/processed/v
 - `PHISHING`: 위험도 70% 이상
 
 운영 단계에서는 검증 데이터 성능과 오탐 비용을 기준으로 임계값을 다시 조정해야 합니다.
+
+## 외부 검증 시드셋
+
+`data/external_test_seed.csv`는 학습에 사용하지 않는 검증용 시드셋입니다. 공식 정상 URL과 `example.com` 기반 합성 금융·정책자금 사칭 URL을 포함하며, 실제 피싱 사이트에 접속하지 않고 1차 라우팅을 검증할 때 사용합니다. 실제 대량 원본은 `data/raw/`에 별도로 수집하고 Git에는 커밋하지 않습니다.

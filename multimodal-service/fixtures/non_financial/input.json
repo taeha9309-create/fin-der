@@ -2,7 +2,7 @@
   "analysis_id": "non_financial_001",
   "original_url": "https://starlight-warriors.example/event",
   "final_url": "https://starlight-warriors.example/event/login",
-  "screenshot_path": "C:\\financial-phishing\\multimodal\\fixtures\\non_financial\\test.png",
+  "screenshot_path": "test.png",
   "page_text": "별빛용사 여름 출석 이벤트 게임 계정으로 로그인하고 한정판 의상 아이템을 받으세요. 이벤트 기간과 참여 방법, 게임 업데이트 소식을 확인할 수 있습니다.",
   "html": "<html><body><header>별빛용사</header><main><h1>여름 출석 이벤트</h1><p>게임 계정으로 로그인하고 한정판 의상 아이템을 받으세요.</p><form action=\"https://starlight-warriors.example/event/login\" method=\"post\"><input name=\"game_id\" type=\"text\"><input name=\"game_password\" type=\"password\"><button>게임 로그인</button></form></main></body></html>",
   "forms": [

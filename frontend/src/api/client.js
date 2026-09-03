@@ -5,7 +5,8 @@ const api = axios.create({
 });
 
 export function analyzeUrl(url) {
-  return api.post("/analyze", { url }).then((res) => res.data);
+  // backend(오케스트레이터) -> ml-service -> (필요시) sandbox -> db-api 저장까지 거침
+  return api.post("/v1/url-analysis", { url }).then((res) => res.data);
 }
 
 export function getAnalysis(id) {

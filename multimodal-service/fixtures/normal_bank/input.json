@@ -2,7 +2,7 @@
   "analysis_id": "normal_bank_001",
   "original_url": "https://www.kbstar.com",
   "final_url": "https://www.kbstar.com",
-  "screenshot_path": "C:\\financial-phishing\\multimodal\\fixtures\\normal_bank\\test.png",
+  "screenshot_path": "test.png",
   "page_text": "KB국민은행 개인 기업 금융상품 자산관리 부동산 퇴직연금 카드 전체서비스 로그인 인증센터",
   "html": "<html><body><header>KB국민은행</header><nav>개인 기업 금융상품 자산관리 로그인 인증센터</nav><main>금융상품 및 KB국민은행 서비스 안내</main></body></html>",
   "forms": []

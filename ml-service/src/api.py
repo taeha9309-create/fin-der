@@ -38,13 +38,14 @@ def analyze(payload: AnalyzeRequest, request: Request) -> dict[str, object]:
         result = model.predict(payload.url)
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
+    risk_score = round(result.probability * 100)
     return {
         "url": payload.url,
         "stage": "URL_XGBOOST",
         "risk_probability": round(result.probability, 6),
-        "risk_score": round(result.probability * 100),
+        "risk_score": risk_score,
         "label": result.label,
-        "requires_deep_analysis": result.probability >= 0.40,
+        "requires_deep_analysis": risk_score >= 40,
         "xai_reasons": result.reasons,
         "features": result.features,
         "model_version": result.model_version,

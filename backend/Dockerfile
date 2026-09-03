@@ -14,9 +14,11 @@ FROM eclipse-temurin:21-jre
 
 WORKDIR /app
 
-COPY --from=build /app/build/libs/*.jar app.jar
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
 
-ENV SANDBOX_BASE_URL=http://sandbox:3001
+COPY --from=build /app/build/libs/*.jar app.jar
 
 EXPOSE 8080
 

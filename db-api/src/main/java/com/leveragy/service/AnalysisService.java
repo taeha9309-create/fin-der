@@ -1,5 +1,6 @@
 package com.leveragy.service;
 
+import com.leveragy.dto.AnalyzeRequest;
 import com.leveragy.entity.UrlAnalysis;
 import com.leveragy.repository.UrlAnalysisRepository;
 import org.springframework.stereotype.Service;
@@ -8,9 +9,9 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
- * TODO: 이 서비스는 팀원 A(XGBoost)/팀원 C(Multimodal)의 실제 파이프라인이
- * 완성되면 해당 API 호출로 교체될 자리표시자(placeholder)다.
- * 지금은 프론트-백엔드-DB 연결 자체를 검증하기 위해 키워드 기반으로 목업 결과를 만든다.
+ * backend(오케스트레이터)가 ml-service/sandbox 결과를 이미 계산해서 보내면
+ * 그 값을 그대로 저장한다. riskScore/finalResult 등이 비어 있으면(단독 테스트 등)
+ * 키워드 기반 목업 로직으로 대체한다.
  */
 @Service
 public class AnalysisService {
@@ -26,17 +27,26 @@ public class AnalysisService {
         this.urlAnalysisRepository = urlAnalysisRepository;
     }
 
-    public UrlAnalysis analyze(String url) {
-        int riskScore = computeMockRiskScore(url);
-        String finalResult = riskScore >= 70 ? "PHISHING" : riskScore >= 40 ? "SUSPICIOUS" : "NORMAL";
-
+    public UrlAnalysis analyze(AnalyzeRequest request) {
         UrlAnalysis analysis = new UrlAnalysis();
-        analysis.setUrl(url);
-        analysis.setRiskScore(riskScore);
-        analysis.setMlResult("{\"note\":\"placeholder - XGBoost 연동 예정\"}");
-        analysis.setMultimodalResult("{\"note\":\"placeholder - Multimodal 분석 연동 예정\"}");
-        analysis.setXaiResult(buildMockXaiReasons(url, riskScore));
-        analysis.setFinalResult(finalResult);
+        analysis.setUrl(request.getUrl());
+
+        if (request.hasPrecomputedResult()) {
+            analysis.setRiskScore(request.getRiskScore());
+            analysis.setMlResult(request.getMlResult());
+            analysis.setMultimodalResult(request.getMultimodalResult());
+            analysis.setXaiResult(request.getXaiResult());
+            analysis.setFinalResult(request.getFinalResult());
+        } else {
+            int riskScore = computeMockRiskScore(request.getUrl());
+            String finalResult = riskScore >= 70 ? "PHISHING" : riskScore >= 40 ? "SUSPICIOUS" : "NORMAL";
+
+            analysis.setRiskScore(riskScore);
+            analysis.setMlResult("{\"note\":\"placeholder - XGBoost 연동 예정\"}");
+            analysis.setMultimodalResult("{\"note\":\"placeholder - Multimodal 분석 연동 예정\"}");
+            analysis.setXaiResult(buildMockXaiReasons(request.getUrl(), riskScore));
+            analysis.setFinalResult(finalResult);
+        }
 
         return urlAnalysisRepository.save(analysis);
     }

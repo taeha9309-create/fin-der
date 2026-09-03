@@ -39,8 +39,15 @@ def train(csv_path: Path, output_path: Path, eval_path: Path | None = None, metr
         )
 
     model = XGBClassifier(
-        n_estimators=350, max_depth=6, learning_rate=0.05, subsample=0.85,
-        colsample_bytree=0.85, eval_metric="logloss", random_state=42, n_jobs=-1,
+        n_estimators=200,
+        max_depth=3,
+        learning_rate=0.05,
+        min_child_weight=0,
+        subsample=0.85,
+        colsample_bytree=0.85,
+        eval_metric="logloss",
+        random_state=42,
+        n_jobs=-1,
     )
     model.fit(x_train, y_train)
     probabilities = model.predict_proba(x_test)[:, 1]

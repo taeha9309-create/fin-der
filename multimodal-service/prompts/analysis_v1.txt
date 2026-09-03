@@ -1,4 +1,4 @@
-다음 금융 웹페이지 정보를 분석하십시오.
+다음 Sandbox 수집 결과와 스크린샷을 분석하십시오.
 
 [analysis_id]
 {analysis_id}
@@ -9,27 +9,19 @@
 [final_url]
 {final_url}
 
-[page_text]
+[title]
+{title}
+
+[visible_text]
 {page_text}
 
-[html]
+[preprocessed_html]
 {html}
 
 [forms]
 {forms}
 
-[screenshot]
-screenshot_path에 해당하는 이미지를 함께 참고하십시오.
+[buttons_links_downloads]
+{dom_signals}
 
-위 입력과 스크린샷을 기준으로 다음을 분석하십시오.
-
-- 금융기관 또는 금융서비스 사칭 여부
-- 사칭이 의심되는 브랜드
-- 브랜드 분류
-- 공격 유형
-- 화면에서 발견된 주요 요소
-- 위험 판단 근거
-- 분석 신뢰도
-
-반환 결과는 system prompt에서 지정한 JSON 구조를 정확히 따르십시오.
-JSON 이외의 문장은 출력하지 마십시오.
+URL은 공식 도메인 여부와 리디렉션 맥락을 판단하는 근거로만 사용하고 1차 URL 모델의 역할을 재현하지 마십시오. 화면·문구·DOM의 실제 증거를 함께 비교하여 최신 JSON 계약으로만 반환하십시오.

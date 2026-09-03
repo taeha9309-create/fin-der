@@ -7,20 +7,23 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent
 APP_DIR = BASE_DIR / "app"
 DEFAULT_FIXTURES = (
+    "normal_bank",
+    "non_financial",
+    "fake_bank",
     "card_capital",
     "internet_bank",
     "government_support",
-    "non_financial",
 )
 REQUIRED_RESULT_FIELDS = (
-    "multimodal_risk_score",
-    "risk_level",
-    "is_financial_impersonation",
+    "verdict",
+    "risk_score",
+    "impersonation_type",
     "impersonated_brand",
-    "brand_category",
-    "attack_type",
-    "confidence",
-    "reasons",
+    "credential_request",
+    "financial_action_request",
+    "app_install_request",
+    "external_contact_request",
+    "evidence",
 )
 
 
@@ -37,25 +40,23 @@ def load_fixture(fixture_name: str) -> dict:
         input_data = json.load(input_file)
 
     screenshot_path = Path(input_data["screenshot_path"])
+    if not screenshot_path.is_absolute():
+        screenshot_path = input_path.parent / screenshot_path
+    elif not screenshot_path.is_file():
+        screenshot_path = input_path.parent / screenshot_path.name
     if not screenshot_path.is_file():
         raise FileNotFoundError(
             f"fixture 이미지가 없습니다: {screenshot_path} "
             "(필요한 이미지 내용은 README.md를 확인하세요.)"
         )
 
+    input_data["screenshot_path"] = str(screenshot_path.resolve())
     return input_data
 
 
 def validate_result(result: dict) -> None:
-    if "analysis_id" not in result:
-        raise ValueError("분석 결과에 analysis_id가 없습니다.")
-
-    multimodal_result = result.get("multimodal_result")
-    if not isinstance(multimodal_result, dict):
-        raise ValueError("분석 결과에 multimodal_result 객체가 없습니다.")
-
     missing_fields = [
-        field for field in REQUIRED_RESULT_FIELDS if field not in multimodal_result
+        field for field in REQUIRED_RESULT_FIELDS if field not in result
     ]
     if missing_fields:
         raise ValueError(
@@ -67,6 +68,10 @@ def run_fixture(fixture_name: str, results_dir: Path) -> Path:
     input_data = load_fixture(fixture_name)
     result = analyze(input_data)
     validate_result(result)
+
+    if fixture_name in {"normal_bank", "non_financial"}:
+        if result["verdict"] == "PHISHING":
+            raise ValueError(f"{fixture_name} fixture was falsely classified as high risk")
 
     results_dir.mkdir(parents=True, exist_ok=True)
     result_path = results_dir / f"{fixture_name}.json"
@@ -85,14 +90,20 @@ def parse_args() -> argparse.Namespace:
         "fixtures",
         nargs="*",
         default=list(DEFAULT_FIXTURES),
-        help="실행할 fixture 이름 (미지정 시 신규 fixture 4개 실행)",
+        help="실행할 fixture 이름 (미지정 시 안전한 합성 fixture 6개 실행)",
+    )
+    parser.add_argument(
+        "--results-dir",
+        type=Path,
+        default=BASE_DIR / "results",
+        help="결과 JSON을 저장할 경로 (기본값: 프로젝트 results 폴더)",
     )
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
-    results_dir = BASE_DIR / "results"
+    results_dir = args.results_dir
     failed = False
 
     for fixture_name in args.fixtures:

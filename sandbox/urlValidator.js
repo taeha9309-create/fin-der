@@ -6,9 +6,40 @@ const blockedHostnames = new Set([
   "localhost.localdomain",
 ]);
 
-function isBlockedAddress(address) {
+function isBlockedHostname(hostname) {
+  return (
+    blockedHostnames.has(hostname) ||
+    hostname.endsWith(".localhost") ||
+    hostname.endsWith(".local")
+  );
+}
+
+function getTestAllowedHostname() {
+  const hostname = process.env.SANDBOX_TEST_ALLOW_HOST?.trim().toLowerCase();
+
+  if (
+    !hostname ||
+    hostname.length > 253 ||
+    ipaddr.isValid(hostname) ||
+    isBlockedHostname(hostname)
+  ) {
+    return null;
+  }
+
+  const labels = hostname.split(".");
+  const isValidHostname = labels.every(
+    (label) =>
+      label.length > 0 &&
+      label.length <= 63 &&
+      /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(label),
+  );
+
+  return isValidHostname ? hostname : null;
+}
+
+function getAddressRange(address) {
   if (!ipaddr.isValid(address)) {
-    return true;
+    return null;
   }
 
   let parsedAddress = ipaddr.parse(address);
@@ -17,7 +48,15 @@ function isBlockedAddress(address) {
     parsedAddress = parsedAddress.toIPv4Address();
   }
 
-  const range = parsedAddress.range();
+  return parsedAddress.range();
+}
+
+function isBlockedAddress(address) {
+  const range = getAddressRange(address);
+
+  if (range === null) {
+    return true;
+  }
 
   const blockedRanges = new Set([
     "unspecified",
@@ -32,6 +71,10 @@ function isBlockedAddress(address) {
   ]);
 
   return blockedRanges.has(range);
+}
+
+function isPrivateAddress(address) {
+  return new Set(["private", "uniqueLocal"]).has(getAddressRange(address));
 }
 
 async function validateUrl(input) {
@@ -52,12 +95,9 @@ async function validateUrl(input) {
   }
 
   const hostname = parsedUrl.hostname.toLowerCase();
+  const isTestAllowedHost = hostname === getTestAllowedHostname();
 
-  if (
-    blockedHostnames.has(hostname) ||
-    hostname.endsWith(".localhost") ||
-    hostname.endsWith(".local")
-  ) {
+  if (isBlockedHostname(hostname)) {
     const error = new Error("내부 주소에는 접속할 수 없습니다.");
     error.code = "PRIVATE_ADDRESS_BLOCKED";
     throw error;
@@ -78,7 +118,11 @@ async function validateUrl(input) {
 
   if (
     addresses.length === 0 ||
-    addresses.some(({ address }) => isBlockedAddress(address))
+    addresses.some(
+      ({ address }) =>
+        isBlockedAddress(address) &&
+        !(isTestAllowedHost && isPrivateAddress(address)),
+    )
   ) {
     const error = new Error("내부 또는 비공개 IP 주소에는 접속할 수 없습니다.");
     error.code = "PRIVATE_ADDRESS_BLOCKED";

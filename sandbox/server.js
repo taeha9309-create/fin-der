@@ -6,7 +6,7 @@ const { chromium } = require("playwright");
 const { validateUrl } = require("./urlValidator");
 
 const app = express();
-const PORT = 3001;
+const PORT = Number(process.env.PORT) || 3001;
 
 const MAX_HTML_BYTES = 2 * 1024 * 1024;
 const MAX_TEXT_BYTES = 1 * 1024 * 1024;

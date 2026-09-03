@@ -19,3 +19,12 @@ analysis:
   timeout-seconds: ${ANALYSIS_TIMEOUT_SECONDS:90}
   job-retention-hours: ${ANALYSIS_JOB_RETENTION_HOURS:24}
   job-cleanup-interval-ms: ${ANALYSIS_JOB_CLEANUP_INTERVAL_MS:3600000}
+
+ml-service:
+  base-url: ${ML_SERVICE_BASE_URL:http://localhost:8001}
+
+db-api:
+  base-url: ${DB_API_BASE_URL:http://localhost:8081}
+
+multimodal-service:
+  base-url: ${MULTIMODAL_SERVICE_BASE_URL:http://localhost:8002}

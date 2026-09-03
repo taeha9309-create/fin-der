@@ -1,5 +1,6 @@
 package com.phishing.backend.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -8,6 +9,11 @@ import org.springframework.web.reactive.function.client.WebClient;
 
 @Configuration
 public class WebClientConfig {
+
+    @Bean
+    public ObjectMapper objectMapper() {
+        return new ObjectMapper();
+    }
 
     @Bean
     public WebClient sandboxWebClient(
@@ -47,6 +53,40 @@ public class WebClientConfig {
     ) {
         return WebClient.builder()
                 .baseUrl(urlAnalysisBaseUrl)
+                .build();
+    }
+
+    @Bean
+    public WebClient mlServiceWebClient(
+            @Value("${ml-service.base-url}") String mlServiceBaseUrl
+    ) {
+        return WebClient.builder()
+                .baseUrl(mlServiceBaseUrl)
+                .build();
+    }
+
+    @Bean
+    public WebClient dbApiWebClient(
+            @Value("${db-api.base-url}") String dbApiBaseUrl
+    ) {
+        return WebClient.builder()
+                .baseUrl(dbApiBaseUrl)
+                .build();
+    }
+
+    @Bean
+    public WebClient multimodalWebClient(
+            @Value("${multimodal-service.base-url}") String multimodalBaseUrl
+    ) {
+        ExchangeStrategies strategies = ExchangeStrategies.builder()
+                .codecs(configurer ->
+                        configurer.defaultCodecs().maxInMemorySize(25 * 1024 * 1024)
+                )
+                .build();
+
+        return WebClient.builder()
+                .baseUrl(multimodalBaseUrl)
+                .exchangeStrategies(strategies)
                 .build();
     }
 }

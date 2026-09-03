@@ -2,7 +2,7 @@
   "analysis_id": "fake_bank_001",
   "original_url": "https://example.com",
   "final_url": "https://redirected-example.com/login",
-  "screenshot_path": "C:\\financial-phishing\\multimodal\\fixtures\\fake_bank\\test.png",
+  "screenshot_path": "test.png",
   "page_text": "KB국민은행 보안인증...",
   "html": "...",
   "forms": [

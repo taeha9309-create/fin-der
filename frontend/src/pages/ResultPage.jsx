@@ -50,7 +50,7 @@ export default function ResultPage() {
         <h2>판단 근거 (XAI)</h2>
         <ul>
           {reasons.map((reason, idx) => (
-            <li key={idx}>{reason}</li>
+            <li key={idx}>{formatReason(reason)}</li>
           ))}
         </ul>
       </section>
@@ -67,4 +67,17 @@ function safeParseReasons(xaiResult) {
   } catch {
     return [];
   }
+}
+
+// db-api 목업의 문자열 배열과 ML 서비스의 SHAP 근거 객체를 모두 표시한다.
+function formatReason(reason) {
+  if (typeof reason === "string") return reason;
+  if (reason && typeof reason === "object" && reason.reason) {
+    const arrow = reason.direction === "RISK_UP" ? "↑" : "↓";
+    const contribution = Number.isFinite(reason.contribution)
+      ? ` (${reason.contribution.toFixed(4)})`
+      : "";
+    return `${reason.reason} ${arrow}${contribution}`;
+  }
+  return JSON.stringify(reason);
 }

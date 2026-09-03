@@ -58,4 +58,3 @@ def analyze_financial_domain(raw_url: str) -> dict[str, object]:
         "brand_domain_similarity": similarity,
         "brand_domain_mismatch": bool(best and domain != expected_domain),
     }
-

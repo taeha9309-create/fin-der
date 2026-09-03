@@ -23,7 +23,7 @@ public class AnalysisController {
 
     @PostMapping
     public ResponseEntity<UrlAnalysis> analyze(@Valid @RequestBody AnalyzeRequest request) {
-        UrlAnalysis result = analysisService.analyze(request.getUrl());
+        UrlAnalysis result = analysisService.analyze(request);
         return ResponseEntity.ok(result);
     }
 

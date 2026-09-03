@@ -1,0 +1,14 @@
+services:
+  sandbox:
+    dns:
+      - ${LOCAL_E2E_DNS_SERVER:-1.1.1.1}
+    dns_opt:
+      - ${LOCAL_E2E_DNS_OPTION:-use-vc}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  multimodal-service:
+    dns:
+      - ${LOCAL_E2E_DNS_SERVER:-1.1.1.1}
+    dns_opt:
+      - ${LOCAL_E2E_DNS_OPTION:-use-vc}

@@ -1,4 +1,5 @@
 node_modules
+.npm-cache
 npm-debug.log
 page.html
 screenshot.png

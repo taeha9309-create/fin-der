@@ -2,7 +2,7 @@
   "analysis_id": "internet_bank_001",
   "original_url": "https://kakaobank-security.example/notice",
   "final_url": "https://auth-kakaobank.example/login",
-  "screenshot_path": "C:\\financial-phishing\\multimodal\\fixtures\\internet_bank\\test.png",
+  "screenshot_path": "test.png",
   "page_text": "카카오뱅크 이상거래 감지 안내 계좌 보호를 위해 즉시 로그인하고 본인인증을 완료해 주세요. 휴대전화번호, 계좌 비밀번호, 인증번호를 입력하지 않으면 이용이 제한됩니다.",
   "html": "<html><body><header>카카오뱅크</header><main><h1>이상거래 감지</h1><p>계좌 보호를 위해 본인인증이 필요합니다.</p><form action=\"https://credential-box.example/auth\" method=\"post\"><input name=\"phone\" type=\"tel\"><input name=\"account_password\" type=\"password\"><input name=\"otp\" type=\"text\"><button>인증 완료</button></form></main></body></html>",
   "forms": [

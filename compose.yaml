@@ -11,15 +11,21 @@ services:
     image: mysql:8.0
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: ${DATABASE_NAME}
-      MYSQL_USER: ${DATABASE_USER}
-      MYSQL_PASSWORD: ${DATABASE_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DATABASE_ROOT_PASSWORD:-change-root-password}
+      MYSQL_DATABASE: ${DATABASE_NAME:-finder}
+      MYSQL_USER: ${DATABASE_USER:-finder}
+      MYSQL_PASSWORD: ${DATABASE_PASSWORD:-change-me}
     ports:
-      - "3306:3306"
+      - "${DATABASE_HOST_PORT:-3307}:3306"
     volumes:
       - database_data:/var/lib/mysql
-      - ./database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
     logging: *default-logging
 
   db-api:
@@ -28,16 +34,40 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     depends_on:
-      - database
+      database:
+        condition: service_healthy
     environment:
       DATABASE_HOST: database
       DATABASE_PORT: 3306
-      DATABASE_NAME: ${DATABASE_NAME}
-      DATABASE_USER: ${DATABASE_USER}
-      DATABASE_PASSWORD: ${DATABASE_PASSWORD}
-      CORS_ORIGINS: http://localhost:${FRONTEND_PORT}
+      DATABASE_NAME: ${DATABASE_NAME:-finder}
+      DATABASE_USER: ${DATABASE_USER:-finder}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-change-me}
+      CORS_ORIGINS: http://localhost:${FRONTEND_PORT:-3000}
     ports:
-      - "${DB_API_PORT}:8081"
+      - "${DB_API_PORT:-8081}:8081"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8081/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 30s
+    logging: *default-logging
+
+  ml-service:
+    build:
+      context: ./ml-service
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      MODEL_PATH: /app/artifacts/url_xgb.joblib
+    ports:
+      - "${ML_SERVICE_PORT:-8001}:8001"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import json,urllib.request; data=json.load(urllib.request.urlopen('http://localhost:8001/health')); assert data['model_loaded']"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
     logging: *default-logging
 
   sandbox:
@@ -50,6 +80,9 @@ services:
       ANALYSIS_STORAGE_DIR: /data/analyses
       ANALYSIS_RETENTION_HOURS: ${ANALYSIS_RETENTION_HOURS:-24}
       CLEANUP_INTERVAL_MINUTES: ${CLEANUP_INTERVAL_MINUTES:-60}
+      SANDBOX_TEST_ALLOW_HOST: ${SANDBOX_TEST_ALLOW_HOST:-}
+    ports:
+      - "${SANDBOX_SERVICE_PORT:-8003}:3001"
     volumes:
       - analysis_data:/data/analyses
     mem_limit: 1g
@@ -58,14 +91,33 @@ services:
     shm_size: 512mb
     init: true
     restart: unless-stopped
-    logging: *default-logging
-
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
       interval: 5s
-      timeout: 3s
-      retries: 10
-      start_period: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
+    logging: *default-logging
+
+  multimodal-service:
+    build:
+      context: ./multimodal-service
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.1-flash-lite-preview}
+      MAX_SCREENSHOT_BYTES: 10485760
+      MAX_HTML_BYTES: 2097152
+    ports:
+      - "${MULTIMODAL_SERVICE_PORT:-8002}:8002"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8002/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
+    logging: *default-logging
 
   page-ai-mock:
     build:
@@ -79,14 +131,13 @@ services:
     pids_limit: 64
     init: true
     restart: unless-stopped
-    logging: *default-logging
-
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8002/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
       interval: 5s
       timeout: 3s
       retries: 10
       start_period: 5s
+    logging: *default-logging
 
   url-ai-mock:
     build:
@@ -99,23 +150,25 @@ services:
     pids_limit: 64
     init: true
     restart: unless-stopped
-    logging: *default-logging
-
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8001/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
       interval: 5s
       timeout: 3s
       retries: 10
       start_period: 5s
+    logging: *default-logging
 
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     ports:
-      - "8080:8080"
+      - "${BACKEND_PORT:-8080}:8080"
     environment:
       SANDBOX_BASE_URL: http://sandbox:3001
+      ML_SERVICE_BASE_URL: http://ml-service:8001
+      MULTIMODAL_SERVICE_BASE_URL: http://multimodal-service:8002
+      DB_API_BASE_URL: http://db-api:8081
       ANALYSIS_ARTIFACT_STORAGE_DIR: /data/analyses
       PAGE_ANALYSIS_BASE_URL: http://page-ai-mock:8002
       URL_ANALYSIS_BASE_URL: http://url-ai-mock:8001
@@ -130,7 +183,13 @@ services:
       - analysis_job_data:/data/jobs
       - analysis_data:/data/analyses:ro
     depends_on:
+      db-api:
+        condition: service_healthy
+      ml-service:
+        condition: service_healthy
       sandbox:
+        condition: service_healthy
+      multimodal-service:
         condition: service_healthy
       page-ai-mock:
         condition: service_healthy
@@ -141,6 +200,32 @@ services:
     pids_limit: 128
     init: true
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 30s
+    logging: *default-logging
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+      db-api:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
     logging: *default-logging
 
 volumes:

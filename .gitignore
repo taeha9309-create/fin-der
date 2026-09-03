@@ -35,12 +35,14 @@ ml-service/data/processed/*
 
 # Node / React
 node_modules/
+.npm-cache/
 dist/
 build/
 coverage/
 
 # Java / Spring
 .gradle/
+.gradle-user-home/
 target/
 *.class
 

@@ -1,15 +1,12 @@
 {
-  "analysis_id": "ana_001",
-  "original_url": "https://example.com",
-  "final_url": "https://redirected-example.com/login",
-  "screenshot_path": "C:\\financial-phishing\\multimodal\\fixtures\\phishing\\test.png",
-  "page_text": "KB국민은행 보안인증...",
-  "html": "...",
-  "forms": [
-    {
-      "action": "https://unknown-server.example/submit",
-      "method": "POST",
-      "input_types": ["text", "password", "tel"]
-    }
-  ]
+  "requestedUrl": "https://fake-support.example/apply",
+  "finalUrl": "https://fake-support.example/form",
+  "statusCode": 200,
+  "title": "정책자금 신청",
+  "html": "<html><body><form><input name=\"resident_number\"><button>신청</button></form></body></html>",
+  "screenshotBase64": "iVBORw0KGgoAAA...",
+  "htmlSizeBytes": 1024,
+  "screenshotSizeBytes": 4096,
+  "loadTimeMs": 520,
+  "error": null
 }
