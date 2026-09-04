@@ -3,12 +3,20 @@
 import json
 import re
 
-from pydantic import ValidationError
+from typing import Literal
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-try:
-    from .schemas import AnalyzeResponse
-except ImportError:  # Direct script/fixture execution from app/.
-    from schemas import AnalyzeResponse
+class GeminiResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    verdict: Literal["NORMAL", "SUSPICIOUS", "PHISHING", "UNKNOWN"]
+    risk_score: int = Field(ge=0, le=100, strict=True)
+    impersonation_type: str
+    impersonated_brand: str | None
+    credential_request: bool = Field(strict=True)
+    financial_action_request: bool = Field(strict=True)
+    app_install_request: bool = Field(strict=True)
+    external_contact_request: bool = Field(strict=True)
+    evidence: list[str]
 
 
 def _contains_any(values: list[str], keywords: tuple[str, ...]) -> bool:
@@ -103,7 +111,7 @@ def parse_multimodal_response(response_text: str) -> dict:
         ) from error
 
     try:
-        validated = AnalyzeResponse.model_validate(_adapt_legacy_response(result))
+        validated = GeminiResponse.model_validate(_adapt_legacy_response(result))
     except ValidationError as error:
         missing = [
             ".".join(str(part) for part in item["loc"])

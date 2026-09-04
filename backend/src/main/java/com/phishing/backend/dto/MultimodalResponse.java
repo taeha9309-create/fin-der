@@ -1,20 +1,17 @@
 package com.phishing.backend.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonProperty;
-
 import java.util.List;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record MultimodalResponse(
-        String verdict,
-        @JsonProperty("risk_score") Integer riskScore,
-        @JsonProperty("impersonation_type") String impersonationType,
-        @JsonProperty("impersonated_brand") String impersonatedBrand,
-        @JsonProperty("credential_request") boolean credentialRequest,
-        @JsonProperty("financial_action_request") boolean financialActionRequest,
-        @JsonProperty("app_install_request") boolean appInstallRequest,
-        @JsonProperty("external_contact_request") boolean externalContactRequest,
-        List<String> evidence
+        String analysisId, Integer pageRiskScore, String verdict,
+        Impersonation impersonation, CredentialIntent credentialIntent,
+        DomainAnalysis domainAnalysis, BehaviorAnalysis behaviorAnalysis,
+        List<String> detectedSignals, List<String> reasons, Double confidence
 ) {
+    public record Impersonation(Boolean detected, String brand, String category) {}
+    public record CredentialIntent(Boolean detected, List<String> types) {}
+    public record DomainAnalysis(String currentDomain, List<String> officialDomains, Boolean domainBrandMismatch) {}
+    public record BehaviorAnalysis(Boolean financialActionRequest, Boolean externalContactRequest, Boolean downloadRequest) {}
 }

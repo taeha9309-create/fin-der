@@ -76,11 +76,16 @@ public class AnalysisOrchestrator {
         }
 
         MultimodalRequest multimodalRequest = new MultimodalRequest(
+                combined.sandbox.analysisId(),
                 combined.sandbox.requestedUrl(),
                 combined.sandbox.finalUrl(),
                 combined.sandbox.statusCode(),
-                combined.sandbox.title(),
-                combined.sandbox.html(),
+                new MultimodalRequest.Page(combined.sandbox.title(), combined.sandbox.text(), combined.sandbox.html()),
+                combined.sandbox.inputs(),
+                combined.sandbox.forms(),
+                combined.sandbox.links(),
+                combined.sandbox.network(),
+                combined.sandbox.redirectChain(),
                 combined.sandbox.screenshotBase64(),
                 combined.sandbox.error()
         );

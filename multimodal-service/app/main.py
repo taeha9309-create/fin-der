@@ -1,83 +1,54 @@
-"""FastAPI boundary compatible with the current Sandbox response."""
-
+"""Connect collected page facts to deterministic rules, optional Gemini, and fusion."""
 from __future__ import annotations
-
-import base64
-import binascii
-import tempfile
-import uuid
+import base64, binascii, tempfile, uuid
 from pathlib import Path
 from urllib.parse import urljoin, urlparse
-
 from bs4 import BeautifulSoup
 from fastapi import FastAPI, HTTPException
 
 try:
     from .analyzer import analyze
     from .config import Settings
-    from .schemas import AnalyzeRequest, AnalyzeResponse, unknown_response
-except ImportError:  # Uvicorn started from app/ as used by the Dockerfile.
+    from .dom_risk_analyzer import analyze_dom_risk
+    from .risk_fusion import fuse_analysis
+    from .schemas import AnalyzeRequest, AnalyzeResponse
+except ImportError:
     from analyzer import analyze
     from config import Settings
-    from schemas import AnalyzeRequest, AnalyzeResponse, unknown_response
+    from dom_risk_analyzer import analyze_dom_risk
+    from risk_fusion import fuse_analysis
+    from schemas import AnalyzeRequest, AnalyzeResponse
 
-app = FastAPI(title="fin-der Multimodal Service", version="2.0.0")
-
+app = FastAPI(title="fin-der Multimodal Service", version="3.0.0")
 
 def _clean_text(value: str) -> str:
     return " ".join(value.split())
 
-
 def extract_dom_context(html: str, base_url: str | None) -> dict:
-    """Extract analysis signals without executing page code or fetching links."""
     if not html:
         return {"visible_text": "", "forms": [], "buttons": [], "links": [], "downloads": []}
-
     soup = BeautifulSoup(html, "html.parser")
     for tag in soup(["script", "style", "noscript", "template"]):
         tag.decompose()
-
     forms = []
     for form in soup.find_all("form", limit=50):
-        inputs = []
-        for element in form.find_all(["input", "select", "textarea"], limit=100):
-            inputs.append({
-                "type": element.get("type", element.name),
-                "name": element.get("name"),
-                "autocomplete": element.get("autocomplete"),
-                "placeholder": element.get("placeholder"),
-            })
-        forms.append({
-            "action": urljoin(base_url or "", form.get("action", "")),
-            "method": str(form.get("method", "get")).upper(),
-            "inputs": inputs,
-        })
-
-    buttons = [
-        _clean_text(element.get_text(" ", strip=True) or element.get("value", ""))
-        for element in soup.find_all(["button", "input"], limit=100)
-        if element.name == "button" or element.get("type") in {"button", "submit"}
-    ]
-    buttons = [text for text in buttons if text]
-
-    links = []
-    downloads = []
-    download_suffixes = {".apk", ".exe", ".msi", ".dmg", ".pkg", ".zip"}
+        inputs = [{key: element.get(key) for key in ("type", "name", "id", "autocomplete", "placeholder")}
+                  for element in form.find_all(["input", "select", "textarea"], limit=100)]
+        forms.append({"action": urljoin(base_url or "", form.get("action", "")),
+                      "method": str(form.get("method", "get")).upper(), "inputs": inputs})
+    buttons = [_clean_text(e.get_text(" ", strip=True) or e.get("value", ""))
+               for e in soup.find_all(["button", "input"], limit=100)
+               if e.name == "button" or e.get("type") in {"button", "submit"}]
+    links, downloads = [], []
+    suffixes = {".apk", ".exe", ".msi", ".dmg", ".pkg", ".zip"}
     for anchor in soup.find_all("a", href=True, limit=200):
         destination = urljoin(base_url or "", anchor["href"])
         item = {"text": _clean_text(anchor.get_text(" ", strip=True)), "destination": destination}
         links.append(item)
-        if anchor.has_attr("download") or Path(urlparse(destination).path).suffix.lower() in download_suffixes:
+        if anchor.has_attr("download") or Path(urlparse(destination).path).suffix.lower() in suffixes:
             downloads.append(item)
-
-    return {
-        "visible_text": _clean_text(soup.get_text(" ", strip=True)),
-        "forms": forms,
-        "buttons": buttons,
-        "links": links,
-        "downloads": downloads,
-    }
-
+    return {"visible_text": _clean_text(soup.get_text(" ", strip=True)), "forms": forms,
+            "buttons": [v for v in buttons if v], "links": links, "downloads": downloads}
 
 def _decode_screenshot(value: str, max_bytes: int) -> bytes:
     encoded = value.strip()
@@ -85,90 +56,85 @@ def _decode_screenshot(value: str, max_bytes: int) -> bytes:
         try:
             header, encoded = encoded.split(",", 1)
         except ValueError as error:
-            raise HTTPException(status_code=422, detail="screenshotBase64 data URI가 올바르지 않습니다.") from error
+            raise HTTPException(422, "Invalid screenshot data URI") from error
         if ";base64" not in header.lower():
-            raise HTTPException(status_code=422, detail="스크린샷 data URI는 Base64 형식이어야 합니다.")
+            raise HTTPException(422, "Screenshot data URI must be base64")
     if len(encoded) > ((max_bytes + 2) // 3) * 4 + 8:
-        raise HTTPException(status_code=413, detail="스크린샷이 허용 크기를 초과했습니다.")
+        raise HTTPException(413, "Screenshot exceeds size limit")
     try:
         decoded = base64.b64decode(encoded, validate=True)
     except (binascii.Error, ValueError) as error:
-        raise HTTPException(status_code=422, detail="screenshotBase64 디코딩에 실패했습니다.") from error
+        raise HTTPException(422, "Invalid screenshot base64") from error
     if not decoded:
-        raise HTTPException(status_code=422, detail="스크린샷 데이터가 비어 있습니다.")
+        raise HTTPException(422, "Screenshot is empty")
     if len(decoded) > max_bytes:
-        raise HTTPException(status_code=413, detail="스크린샷이 허용 크기를 초과했습니다.")
+        raise HTTPException(413, "Screenshot exceeds size limit")
     return decoded
 
+def _semantic_view(result: dict | None) -> dict | None:
+    """Adapt the existing Gemini contract to the bounded fusion hints."""
+    if not result:
+        return None
+    if "semanticRisk" in result:
+        return result
+    score = int(result.get("risk_score", 0))
+    return {
+        "semanticRisk": "HIGH" if score >= 70 else "MEDIUM" if score >= 40 else "LOW",
+        "impersonationContext": bool(result.get("impersonated_brand")),
+        "credentialHarvestingContext": bool(result.get("credential_request")),
+        "socialEngineeringContext": result.get("verdict") in {"SUSPICIOUS", "PHISHING"},
+        "financialManipulationContext": bool(result.get("financial_action_request")),
+        "semanticEvidence": list(result.get("evidence") or []),
+        "confidence": 0.7,
+    }
 
 @app.get("/health")
 def health() -> dict[str, object]:
-    current_settings = Settings.from_env()
-    return {
-        "status": "UP",
-        "service": "multimodal-service",
-        "model": current_settings.gemini_model,
-        "gemini_api_key_configured": current_settings.gemini_api_key is not None,
-    }
-
+    settings = Settings.from_env()
+    return {"status": "UP", "service": "multimodal-service", "model": settings.gemini_model,
+            "gemini_api_key_configured": settings.gemini_api_key is not None}
 
 @app.post("/v1/analyze", response_model=AnalyzeResponse)
 def analyze_endpoint(request: AnalyzeRequest) -> AnalyzeResponse:
-    current_settings = Settings.from_env()
-    if len(request.html.encode("utf-8")) > current_settings.max_html_bytes:
-        raise HTTPException(status_code=413, detail="HTML이 허용 크기를 초과했습니다.")
-    has_screenshot = bool(request.screenshot_base64 and request.screenshot_base64.strip())
-    has_document = bool(request.html.strip() or request.visible_text.strip())
-
-    if not has_screenshot and not has_document:
-        if request.error:
-            return unknown_response(f"Sandbox 수집 실패로 분석할 수 없습니다: {request.error}")
-        return unknown_response("Screenshot과 HTML/Text가 없어 페이지를 분석할 수 없습니다.")
-
-    if current_settings.gemini_api_key is None:
-        raise HTTPException(
-            status_code=503,
-            detail="GEMINI_API_KEY가 설정되어 있지 않아 Gemini 분석을 수행할 수 없습니다.",
-        )
-
+    settings = Settings.from_env()
+    title, visible_text, html = request.page_values()
+    if len(html.encode("utf-8")) > settings.max_html_bytes:
+        raise HTTPException(413, "HTML exceeds size limit")
     final_url = request.final_url or request.requested_url or ""
-    dom = extract_dom_context(request.html, final_url)
-    screenshot_bytes = (
-        _decode_screenshot(request.screenshot_base64, current_settings.max_screenshot_bytes)
-        if has_screenshot and request.screenshot_base64
-        else None
-    )
-
-    tmp_path: Path | None = None
+    dom = extract_dom_context(html, final_url)
+    screenshot_value = request.screenshot if isinstance(request.screenshot, str) else None
+    screenshot_bytes = _decode_screenshot(screenshot_value, settings.max_screenshot_bytes) if screenshot_value else None
+    redirect_urls = [item.get("url", "") if isinstance(item, dict) else str(item) for item in request.redirect_chain]
+    input_data = {
+        "analysis_id": request.analysis_id or uuid.uuid4().hex,
+        "original_url": request.requested_url or final_url, "final_url": final_url,
+        "status_code": request.status_code, "title": title, "page_text": visible_text or dom["visible_text"],
+        "html": html, "inputs": [item.model_dump() for item in request.inputs],
+        "forms": [item.model_dump() for item in request.forms] or dom["forms"],
+        "links": [item.model_dump() for item in request.links] or dom["links"],
+        "network": request.network.model_dump() if request.network else {}, "redirect_chain": redirect_urls,
+        "dom_signals": {"buttons": dom["buttons"], "links": [item.model_dump() for item in request.links] or dom["links"], "downloads": dom["downloads"]},
+    }
+    rule_result = analyze_dom_risk(input_data)
+    tmp_path, semantic_result = None, None
     try:
         if screenshot_bytes is not None:
-            with tempfile.NamedTemporaryFile(prefix="multimodal-", suffix=".img", delete=False) as tmp_file:
-                tmp_file.write(screenshot_bytes)
-                tmp_path = Path(tmp_file.name)
-
-        input_data = {
-            "analysis_id": uuid.uuid4().hex,
-            "original_url": request.requested_url or final_url,
-            "final_url": final_url,
-            "title": request.title,
-            "screenshot_path": str(tmp_path) if tmp_path else None,
-            "page_text": request.visible_text or dom["visible_text"],
-            "html": request.html,
-            "forms": request.forms or dom["forms"],
-            "dom_signals": {
-                "buttons": dom["buttons"],
-                "links": dom["links"],
-                "downloads": dom["downloads"],
-            },
+            with tempfile.NamedTemporaryFile(prefix="multimodal-", suffix=".img", delete=False) as tmp:
+                tmp.write(screenshot_bytes)
+                tmp_path = Path(tmp.name)
+            input_data["screenshot_path"] = str(tmp_path)
+        if settings.gemini_api_key is not None:
+            try:
+                semantic_result = _semantic_view(analyze(input_data))
+            except Exception:
+                semantic_result = None
+        collection_status = {
+            "analysis_id": input_data["analysis_id"], "html": html, "visible_text": input_data["page_text"],
+            "inputs": input_data["inputs"], "forms": input_data["forms"], "links": input_data["links"],
+            "status_code": request.status_code, "screenshot": bool(screenshot_bytes),
+            "semantic_available": semantic_result is not None, "error": request.error,
         }
-        return AnalyzeResponse.model_validate(analyze(input_data))
-    except HTTPException:
-        raise
-    except Exception as error:
-        raise HTTPException(
-            status_code=502,
-            detail="Gemini 분석 또는 응답 검증에 실패했습니다.",
-        ) from error
+        return AnalyzeResponse.model_validate(fuse_analysis(rule_result, semantic_result, collection_status))
     finally:
         if tmp_path is not None:
             tmp_path.unlink(missing_ok=True)
