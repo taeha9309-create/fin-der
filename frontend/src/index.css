@@ -210,6 +210,48 @@ body {
   padding-left: 20px;
 }
 
+.page-analysis-section {
+  background: #fff;
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 16px;
+}
+
+.page-analysis-detail ul {
+  padding-left: 20px;
+}
+
+.page-analysis-detail .mismatch-note {
+  color: #e63946;
+}
+
+.page-analysis-detail code {
+  background: #f5f6fa;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.signal-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.signal-badge {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #ffe0e3;
+  color: #e63946;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.confidence-note {
+  color: #888;
+  font-size: 0.85rem;
+}
+
 .modal-overlay {
   position: fixed;
   inset: 0;

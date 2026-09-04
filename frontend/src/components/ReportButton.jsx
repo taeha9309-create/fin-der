@@ -8,10 +8,10 @@ const QUICK_REASONS = [
   "공식 도메인과 불일치",
 ];
 
-export default function ReportButton({ url }) {
+export default function ReportButton({ url, analysisId }) {
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
-  const [submitted, setSubmitted] = useState(false);
+  const [result, setResult] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -24,8 +24,8 @@ export default function ReportButton({ url }) {
     setSubmitting(true);
     setError("");
     try {
-      await submitReport(url, reason);
-      setSubmitted(true);
+      const saved = await submitReport(url, reason, analysisId);
+      setResult(saved);
     } catch {
       setError("제보 접수에 실패했습니다. 다시 시도해주세요.");
     } finally {
@@ -33,8 +33,13 @@ export default function ReportButton({ url }) {
     }
   }
 
-  if (submitted) {
-    return <p className="report-success">제보가 접수되었습니다. 감사합니다.</p>;
+  if (result) {
+    return (
+      <p className="report-success">
+        제보가 접수되었습니다. 감사합니다.
+        {result.reportCount > 1 && ` (동일 URL 제보 ${result.reportCount}건 통합됨)`}
+      </p>
+    );
   }
 
   if (!open) {

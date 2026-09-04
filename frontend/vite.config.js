@@ -20,6 +20,10 @@ export default defineConfig({
         target: `http://localhost:${process.env.DB_API_PORT || 8081}`,
         changeOrigin: true,
       },
+      "/api/admin": {
+        target: `http://localhost:${process.env.DB_API_PORT || 8081}`,
+        changeOrigin: true,
+      },
     },
   },
 });

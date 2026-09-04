@@ -1,5 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { listReports, updateReportStatus } from "../api/client.js";
+import { Link } from "react-router-dom";
+import {
+  listReports,
+  updateReportStatus,
+  listAnalyses,
+  adminLogin,
+  adminLogout,
+  getAdminToken,
+  clearAdminToken,
+} from "../api/client.js";
 import ErrorState from "../components/ErrorState.jsx";
 
 const STATUS_LABEL = {
@@ -16,7 +25,68 @@ const FILTER_TABS = [
 ];
 
 export default function AdminPage() {
+  const [token, setToken] = useState(getAdminToken());
+
+  if (!token) {
+    return <AdminLoginForm onLoggedIn={() => setToken(getAdminToken())} />;
+  }
+
+  return <AdminDashboard onSessionExpired={() => setToken(null)} />;
+}
+
+function AdminLoginForm({ onLoggedIn }) {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setSubmitting(true);
+    setError("");
+    try {
+      await adminLogin(username.trim(), password);
+      onLoggedIn();
+    } catch {
+      setError("아이디 또는 비밀번호가 올바르지 않습니다.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="page">
+      <h1>관리자 로그인</h1>
+      <p className="subtitle">제보 관리자 Dashboard는 로그인 후 이용할 수 있습니다.</p>
+      <form onSubmit={handleSubmit} className="url-form" style={{ flexDirection: "column", alignItems: "stretch" }}>
+        <input
+          type="text"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          placeholder="아이디"
+          className="url-input"
+          autoComplete="username"
+        />
+        <input
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="비밀번호"
+          className="url-input"
+          autoComplete="current-password"
+        />
+        <button type="submit" className="btn btn-primary" disabled={submitting}>
+          {submitting ? "확인 중..." : "로그인"}
+        </button>
+      </form>
+      {error && <p className="error-text">{error}</p>}
+    </div>
+  );
+}
+
+function AdminDashboard({ onSessionExpired }) {
   const [reports, setReports] = useState(null);
+  const [analysesById, setAnalysesById] = useState({});
   const [error, setError] = useState("");
   const [updatingId, setUpdatingId] = useState(null);
   const [statusFilter, setStatusFilter] = useState("ALL");
@@ -24,10 +94,20 @@ export default function AdminPage() {
 
   const load = useCallback(() => {
     setError("");
-    listReports()
-      .then(setReports)
-      .catch(() => setError("제보 목록을 불러오지 못했습니다."));
-  }, []);
+    Promise.all([listReports(), listAnalyses().catch(() => [])])
+      .then(([reportList, analysisList]) => {
+        setReports(reportList);
+        setAnalysesById(Object.fromEntries(analysisList.map((a) => [a.id, a])));
+      })
+      .catch((err) => {
+        if (err?.response?.status === 401) {
+          clearAdminToken();
+          onSessionExpired();
+          return;
+        }
+        setError("제보 목록을 불러오지 못했습니다.");
+      });
+  }, [onSessionExpired]);
 
   useEffect(() => {
     load();
@@ -38,11 +118,21 @@ export default function AdminPage() {
     try {
       const updated = await updateReportStatus(id, status);
       setReports((prev) => prev.map((r) => (r.id === id ? updated : r)));
-    } catch {
+    } catch (err) {
+      if (err?.response?.status === 401) {
+        clearAdminToken();
+        onSessionExpired();
+        return;
+      }
       setError("상태 변경에 실패했습니다.");
     } finally {
       setUpdatingId(null);
     }
+  }
+
+  async function handleLogout() {
+    await adminLogout();
+    onSessionExpired();
   }
 
   const filteredReports = useMemo(() => {
@@ -60,8 +150,17 @@ export default function AdminPage() {
 
   return (
     <div className="page admin-page">
-      <h1>제보 관리자 Dashboard</h1>
-      <p className="subtitle">사용자 제보를 확인하고 피싱 여부를 확정합니다.</p>
+      <div className="admin-toolbar">
+        <div>
+          <h1 style={{ margin: 0 }}>제보 관리자 Dashboard</h1>
+          <p className="subtitle" style={{ marginBottom: 0 }}>
+            사용자 제보를 확인하고 피싱 여부를 확정합니다.
+          </p>
+        </div>
+        <button className="btn btn-ghost" onClick={handleLogout}>
+          로그아웃
+        </button>
+      </div>
 
       <div className="admin-toolbar">
         <div className="admin-filter-tabs">
@@ -96,8 +195,27 @@ export default function AdminPage() {
               <span className="admin-url">{report.url}</span>
               <span className="admin-status-badge">{STATUS_LABEL[report.status] || report.status}</span>
             </div>
-            {report.reason && <p className="admin-reason">{report.reason}</p>}
+            {report.reportCount > 1 && (
+              <p className="admin-reason" style={{ fontWeight: 600 }}>
+                동일 URL 제보 {report.reportCount}건 통합됨
+              </p>
+            )}
+            {report.reason && <p className="admin-reason" style={{ whiteSpace: "pre-line" }}>{report.reason}</p>}
             <p className="admin-date">{formatDate(report.createdAt)}</p>
+
+            {report.analysisId && analysesById[report.analysisId] ? (
+              <p className="admin-date">
+                분석 결과: <strong>{analysesById[report.analysisId].finalResult}</strong> (
+                {analysesById[report.analysisId].riskScore}/100) ·{" "}
+                <Link to={`/result/${report.analysisId}`} target="_blank" rel="noopener noreferrer">
+                  상세 보기 ↗
+                </Link>
+              </p>
+            ) : report.analysisId ? (
+              <p className="admin-date">연결된 분석을 찾을 수 없습니다 (ID {report.analysisId}).</p>
+            ) : (
+              <p className="admin-date">연결된 분석 이력이 없는 제보입니다.</p>
+            )}
 
             <div className="admin-actions">
               <button

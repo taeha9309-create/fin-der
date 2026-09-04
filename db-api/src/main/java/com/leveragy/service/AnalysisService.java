@@ -37,6 +37,7 @@ public class AnalysisService {
             analysis.setMultimodalResult(request.getMultimodalResult());
             analysis.setXaiResult(request.getXaiResult());
             analysis.setFinalResult(request.getFinalResult());
+            analysis.setScreenshotData(request.getScreenshotData());
         } else {
             int riskScore = computeMockRiskScore(request.getUrl());
             String finalResult = riskScore >= 70 ? "PHISHING" : riskScore >= 40 ? "SUSPICIOUS" : "NORMAL";

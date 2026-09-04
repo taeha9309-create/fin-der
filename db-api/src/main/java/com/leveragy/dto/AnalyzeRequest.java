@@ -14,6 +14,8 @@ public class AnalyzeRequest {
     private String multimodalResult;
     private String xaiResult;
     private String finalResult;
+    // Sandbox가 캡처한 스크린샷(data URI). backend가 아직 안 보내주면 항상 null.
+    private String screenshotData;
 
     public String getUrl() { return url; }
     public void setUrl(String url) { this.url = url; }
@@ -32,6 +34,9 @@ public class AnalyzeRequest {
 
     public String getFinalResult() { return finalResult; }
     public void setFinalResult(String finalResult) { this.finalResult = finalResult; }
+
+    public String getScreenshotData() { return screenshotData; }
+    public void setScreenshotData(String screenshotData) { this.screenshotData = screenshotData; }
 
     public boolean hasPrecomputedResult() {
         return finalResult != null && !finalResult.isBlank();
