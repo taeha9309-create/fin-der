@@ -169,7 +169,7 @@ public class AnalysisJobService {
             PageAnalysisResponse pageAnalysis
     ) {
         FinalAnalysisResponse finalAnalysis = finalRiskPolicy.combine(urlAnalysis, pageAnalysis);
-        SandboxResultSummary resultSummary = summarize(result);
+        SandboxResultSummary resultSummary = result == null ? null : summarize(result);
         AnalysisJobResponse completed = jobs.computeIfPresent(analysisId, (id, current) -> persist(new AnalysisJobResponse(
                 id,
                 AnalysisStatus.COMPLETED,
@@ -223,9 +223,12 @@ public class AnalysisJobService {
     }
 
     private void recordUrlAnalysis(String analysisId, UrlAnalysisResponse urlAnalysis) {
+        AnalysisStatus nextStatus = Boolean.TRUE.equals(urlAnalysis.requiresDeepAnalysis())
+                ? AnalysisStatus.SANDBOX_COLLECTING
+                : AnalysisStatus.FINALIZING;
         jobs.computeIfPresent(analysisId, (id, current) -> persist(new AnalysisJobResponse(
                 id,
-                AnalysisStatus.SANDBOX_COLLECTING,
+                nextStatus,
                 urlAnalysis,
                 current.result(),
                 current.pageAnalysis(),
@@ -394,7 +397,11 @@ public class AnalysisJobService {
         Mono<SandboxResponse> sandboxPipeline = sandboxAnalysis;
         Mono<PipelineResult> analysis = urlAnalysisService.analyze(queued.url())
                 .doOnNext(urlResult -> recordUrlAnalysis(queued.analysisId(), urlResult))
-                .flatMap(urlResult -> sandboxPipeline
+                .flatMap(urlResult -> {
+                    if (!Boolean.TRUE.equals(urlResult.requiresDeepAnalysis())) {
+                        return Mono.just(new PipelineResult(urlResult, null, null));
+                    }
+                    return sandboxPipeline
                         .doOnNext(sandboxResult -> recordSandboxResult(
                                 queued.analysisId(), sandboxResult
                         ))
@@ -405,7 +412,8 @@ public class AnalysisJobService {
                                 .map(pageResult -> new PipelineResult(
                                         urlResult, sandboxResult, pageResult
                                 ))
-                        ));
+                        );
+                });
 
         analysis
                 .timeout(
