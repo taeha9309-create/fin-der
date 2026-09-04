@@ -3,6 +3,21 @@
 이 브랜치 하나에 최근 작업이 전부 쌓여 있습니다. 무엇이 바뀌었는지, 팀원별로 뭘
 확인/추가해야 하는지 정리합니다.
 
+## 업데이트 (async job / 관리자 로그인 / 제보 중복 병합)
+
+이 문서를 쓴 뒤로 아래가 추가됐습니다 (자세한 내용은 PR 설명 참고):
+
+- **비동기 job 패턴**: `POST /api/analyze`가 즉시 `PROCESSING`으로 응답하고,
+  실제 파이프라인은 백그라운드에서 돌다가 `PATCH /api/analyze/{id}`로 완료
+  처리합니다. 프론트는 `GET /api/analyze/{id}`를 폴링합니다.
+- **관리자 로그인**(토큰 기반, 단일 계정)이 붙었습니다 — 아래 "아직 남은 것"에
+  있던 항목이 완료된 것입니다.
+- **제보 중복 병합**: 같은 URL로 여러 번 제보되면 `report_count`만 올립니다.
+- **multimodal-service 계약 반영**: `multimodal-service`가 이제
+  `impersonation`/`credentialIntent`/`domainAnalysis`/`behaviorAnalysis`/
+  `reasons`/`confidence`를 직접 계산해서 내려주므로, `backend`가 브랜드→공식
+  도메인 매핑을 따로 하지 않고 응답을 그대로 저장하도록 정리했습니다.
+
 ## 한 줄 요약
 
 각자 올린 코드가 실제로 서로 호출하도록 연결했고, MVP 필수 화면(로딩·위험도
@@ -102,15 +117,17 @@ frontend → backend(오케스트레이터, 8080)
 
 | 담당 | 할 일 |
 |---|---|
-| **민성이** | `backend/AnalysisOrchestrator`에 제가 추가한 로직 리뷰 (원래 담당 영역). Docker Compose로 전체 스택 한 번에 띄우는 것 아직 안 해봄. 관리자 로그인(인증) 필요 |
+| **민성이** | `backend/AnalysisOrchestrator`에 제가 추가한 async job 로직 리뷰 (원래 담당 영역). `backend/`에 별도로 만들어진 `AnalysisJobController`/`FileAnalysisJobStore`(파일시스템 기반 job)와 db-api 기반 job(이번에 추가된 것) 중 어느 쪽을 계속 쓸지 정리 필요 — 현재는 둘 다 코드에 있지만 frontend는 db-api 쪽만 호출합니다. Docker Compose로 전체 스택 한 번에 띄우는 것 아직 안 해봄 |
 | **김태하** | `AnalysisOrchestrator.combineFinalResult`의 임시 OR 방식을 정식 가중치 로직으로 교체. 실데이터셋으로 재학습 필요(지금 모델은 제가 커넥션 테스트용으로 만든 소규모 합성 데이터로 학습한 것) |
 | **팀원 C** | `GEMINI_API_KEY`를 `.env`에 추가하면 바로 실제 Gemini 응답 테스트 가능. 실제 샘플로 프롬프트/스키마 검증 필요 |
 | **팀원 D (나)** | Threat Intelligence/관리자 로그인 연동, 신고 유형 세분화 등 3~4주차 잔여 항목 |
 
 ## 아직 남은 것
 
-- `GEMINI_API_KEY` 설정 후 실제 Gemini 분석 결과 검증
+- `GEMINI_API_KEY` 설정 후 실제 Gemini 분석 결과 검증 (지금은 503 → ml-service
+  판정만으로 폴백하는 경로까지만 로컬 확인함)
 - ml/multimodal 최종 결합 로직 정식화
-- 관리자 로그인(인증)
+- `backend/`에 중복으로 존재하는 두 비동기 job 시스템(db-api 기반 vs
+  `AnalysisJobController`/파일시스템 기반) 정리 — 팀 논의 필요
 - Docker Compose로 전체 스택 통합 실행 검증
 - 이 브랜치는 아직 `main`에 병합 전 — 민성이 리뷰 후 병합 필요

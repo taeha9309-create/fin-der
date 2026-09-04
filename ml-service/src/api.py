@@ -45,7 +45,9 @@ def analyze(payload: AnalyzeRequest, request: Request) -> dict[str, object]:
         "risk_probability": round(result.probability, 6),
         "risk_score": risk_score,
         "label": result.label,
-        "requires_deep_analysis": risk_score >= 40,
+        # Only uncertain stage-1 results need the expensive Sandbox/Multimodal path.
+        # NORMAL and PHISHING are final decisions at this stage.
+        "requires_deep_analysis": result.label == "SUSPICIOUS",
         "xai_reasons": result.reasons,
         "features": result.features,
         "model_version": result.model_version,

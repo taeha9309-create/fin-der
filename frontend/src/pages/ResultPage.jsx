@@ -151,14 +151,14 @@ export default function ResultPage() {
             </div>
           ) : pageAnalysis ? (
             <div className="site-preview">
-              <div className="fp-bar">🏦 {pageAnalysis.impersonatedBrand || "로그인 페이지"}</div>
+              <div className="fp-bar">🏦 {pageAnalysis.impersonation?.brand || "로그인 페이지"}</div>
               <div className="fp-body">
                 <div className="fp-title">로그인</div>
                 <div className="fp-field">아이디를 입력하세요</div>
-                {pageAnalysis.credentialTypes?.includes("PASSWORD") && (
+                {pageAnalysis.credentialIntent?.types?.includes("PASSWORD") && (
                   <div className="fp-field">비밀번호를 입력하세요</div>
                 )}
-                {pageAnalysis.credentialTypes?.includes("OTP") && (
+                {pageAnalysis.credentialIntent?.types?.includes("OTP") && (
                   <div className="fp-field">OTP 인증번호를 입력하세요</div>
                 )}
                 <div className="fp-btn">로그인</div>
@@ -249,23 +249,23 @@ export default function ResultPage() {
           <h4>
             <span className="owner-tag">3번</span> 공식기관 비교 결과
           </h4>
-          {pageAnalysis?.impersonatedBrand ? (
+          {pageAnalysis?.impersonation?.brand ? (
             <>
               <div className="domain-line">
                 <span className="k">감지된 기관명</span>
-                <span className="v">{pageAnalysis.impersonatedBrand}</span>
+                <span className="v">{pageAnalysis.impersonation.brand}</span>
               </div>
               <div className="domain-line">
                 <span className="k">현재 도메인</span>
-                <span className="v mono">{pageAnalysis.currentDomain}</span>
+                <span className="v mono">{pageAnalysis.domainAnalysis?.currentDomain || "-"}</span>
               </div>
               <div className="domain-arrow">↓</div>
               <div className="domain-line">
                 <span className="k">공식 도메인</span>
-                <span className="v mono">{pageAnalysis.officialDomain || "-"}</span>
-                {pageAnalysis.domainBrandMismatch && <span className="mismatch-badge">불일치</span>}
+                <span className="v mono">{pageAnalysis.domainAnalysis?.officialDomains?.join(", ") || "-"}</span>
+                {pageAnalysis.domainAnalysis?.domainBrandMismatch && <span className="mismatch-badge">불일치</span>}
               </div>
-              {pageAnalysis.domainBrandMismatch && (
+              {pageAnalysis.domainAnalysis?.domainBrandMismatch && (
                 <p className="domain-note">공식 도메인과 일치하지 않아 사칭 가능성이 매우 높습니다.</p>
               )}
             </>
@@ -338,9 +338,10 @@ function RiskIcon({ type }) {
 function buildRiskSummary(pageAnalysis) {
   if (!pageAnalysis) return [];
   const items = [];
-  const brand = pageAnalysis.impersonatedBrand;
+  const brand = pageAnalysis.impersonation?.brand;
+  const credentialTypes = pageAnalysis.credentialIntent?.types || [];
 
-  if (pageAnalysis.domainBrandMismatch) {
+  if (pageAnalysis.domainAnalysis?.domainBrandMismatch) {
     items.push({
       icon: "domain",
       title: "비공식 도메인 사용",
@@ -348,10 +349,10 @@ function buildRiskSummary(pageAnalysis) {
       severity: "danger",
     });
   }
-  if (pageAnalysis.credentialTypes?.includes("PASSWORD")) {
+  if (credentialTypes.includes("PASSWORD")) {
     items.push({ icon: "lock", title: "비밀번호 입력 요구", desc: "사용자 비밀번호 입력 필드 발견", severity: "danger" });
   }
-  if (pageAnalysis.credentialTypes?.includes("OTP")) {
+  if (credentialTypes.includes("OTP")) {
     items.push({ icon: "lock", title: "OTP 입력 요구", desc: "일회용 인증번호 입력 필드 발견", severity: "danger" });
   }
   if (pageAnalysis.detectedSignals?.includes("POST_FORM")) {

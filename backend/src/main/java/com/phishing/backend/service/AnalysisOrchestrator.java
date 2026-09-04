@@ -6,16 +6,14 @@ import com.phishing.backend.dto.AnalyzeRequest;
 import com.phishing.backend.dto.MlServiceResponse;
 import com.phishing.backend.dto.MultimodalRequest;
 import com.phishing.backend.dto.MultimodalResponse;
-import com.phishing.backend.dto.PageAnalysisV2;
 import com.phishing.backend.dto.SandboxResponse;
 import com.phishing.backend.dto.UpdateAnalysisResultRequest;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import java.time.Duration;
 
@@ -28,8 +26,9 @@ import java.time.Duration;
  * 파이프라인 전체가 죽지 않도록 하고 ml-service 판정만으로 finalResult를 정한다.
  * ml/multimodal을 합치는 규칙은 임시(OR 방식)이며, 정식 가중치 로직은 XAI 담당이 정하기로 되어 있다.
  *
- * multimodal-service 응답(v1, 상세 계약)은 팀 보고서 7장의 평탄화 계약(v2)으로
- * 변환해서 저장한다 - db/CONTRACT_HISTORY.md의 v1→v2 매핑을 그대로 따른다.
+ * multimodal-service 응답은 이미 impersonation/domainAnalysis/credentialIntent를
+ * 직접 계산해서 내려주므로 backend에서 별도로 브랜드-도메인 매핑을 하지 않고
+ * 그대로 저장한다.
  */
 @Service
 public class AnalysisOrchestrator {
@@ -41,9 +40,9 @@ public class AnalysisOrchestrator {
     private final ObjectMapper objectMapper;
 
     public AnalysisOrchestrator(
-            WebClient mlServiceWebClient,
-            WebClient dbApiWebClient,
-            WebClient multimodalWebClient,
+            @Qualifier("mlServiceWebClient") WebClient mlServiceWebClient,
+            @Qualifier("dbApiWebClient") WebClient dbApiWebClient,
+            @Qualifier("multimodalWebClient") WebClient multimodalWebClient,
             SandboxService sandboxService,
             ObjectMapper objectMapper
     ) {
@@ -100,11 +99,16 @@ public class AnalysisOrchestrator {
         }
 
         MultimodalRequest multimodalRequest = new MultimodalRequest(
+                combined.sandbox.analysisId(),
                 combined.sandbox.requestedUrl(),
                 combined.sandbox.finalUrl(),
                 combined.sandbox.statusCode(),
-                combined.sandbox.title(),
-                combined.sandbox.html(),
+                new MultimodalRequest.Page(combined.sandbox.title(), combined.sandbox.text(), combined.sandbox.html()),
+                combined.sandbox.inputs(),
+                combined.sandbox.forms(),
+                combined.sandbox.links(),
+                combined.sandbox.network(),
+                combined.sandbox.redirectChain(),
                 combined.sandbox.screenshotBase64(),
                 combined.sandbox.error()
         );
@@ -165,12 +169,14 @@ public class AnalysisOrchestrator {
     }
 
     /**
-     * multimodal-service가 응답했으면 팀 보고서 7장 계약(v2)으로 변환해서 반환한다.
+     * multimodal-service가 응답했으면 그 결과를 그대로 저장한다 - impersonation,
+     * credentialIntent, domainAnalysis, behaviorAnalysis, reasons를 이미 multimodal-service가
+     * 직접 계산해서 내려주므로 backend에서 다시 가공하지 않는다.
      * Sandbox는 붙었지만 multimodal-service가 실패/미설정이면 수집 상태만 기록한다.
      */
     private Object buildMultimodalResult(CombinedResult combined) {
         if (combined.multimodal != null) {
-            return toPageAnalysis(combined.multimodal, combined.sandbox);
+            return combined.multimodal;
         }
         if (combined.sandbox == null) {
             return new SandboxSummary(false, null, null, combined.sandboxError);
@@ -181,93 +187,6 @@ public class AnalysisOrchestrator {
                 combined.sandbox.screenshotSizeBytes(),
                 combined.multimodalError != null ? combined.multimodalError : combined.sandbox.error()
         );
-    }
-
-    /**
-     * multimodal-service는 사칭 브랜드명만 알려주고 공식 도메인과의 비교는 하지 않는다
-     * ("공식기관 Reference DB"는 3번 AI가 관리하기로 되어 있었지만 현재 구현엔 없음).
-     * 그래서 브랜드명 → 공식 도메인 매핑은 ml-service/data/financial_brands.csv와
-     * 같은 목록을 여기서도 참고해 backend에서 직접 비교한다.
-     */
-    private static final Map<String, String> OFFICIAL_DOMAINS = Map.ofEntries(
-            Map.entry("KB국민은행", "kbstar.com"),
-            Map.entry("신한은행", "shinhan.com"),
-            Map.entry("우리은행", "wooribank.com"),
-            Map.entry("하나은행", "kebhana.com"),
-            Map.entry("NH농협은행", "nhbank.com"),
-            Map.entry("IBK기업은행", "ibk.co.kr"),
-            Map.entry("카카오뱅크", "kakaobank.com"),
-            Map.entry("케이뱅크", "kbanknow.com"),
-            Map.entry("토스뱅크", "tossbank.com"),
-            Map.entry("우체국예금보험", "epostbank.go.kr"),
-            Map.entry("서민금융진흥원", "kinfa.or.kr"),
-            Map.entry("소상공인시장진흥공단", "semas.or.kr"),
-            Map.entry("정부24", "gov.kr")
-    );
-
-    private PageAnalysisV2 toPageAnalysis(MultimodalResponse response, SandboxResponse sandbox) {
-        String impersonatedBrand = response.impersonatedBrand();
-        boolean credentialIntent = response.credentialRequest();
-        String currentDomain = extractHost(sandbox != null ? sandbox.finalUrl() : null);
-        String officialDomain = impersonatedBrand != null ? OFFICIAL_DOMAINS.get(impersonatedBrand) : null;
-        boolean domainBrandMismatch = officialDomain != null
-                && currentDomain != null
-                && !currentDomain.toLowerCase().contains(officialDomain.toLowerCase());
-
-        List<String> credentialTypes = credentialIntent ? List.of("CREDENTIAL") : List.of();
-        List<String> detectedSignals = buildDetectedSignals(response, domainBrandMismatch);
-        Map<String, Object> domSummary = buildApproximateDomSummary(response);
-
-        return new PageAnalysisV2(
-                response.riskScore(),
-                impersonatedBrand,
-                credentialIntent,
-                domainBrandMismatch,
-                response.evidence(),
-                currentDomain,
-                officialDomain,
-                credentialTypes,
-                detectedSignals,
-                domSummary
-        );
-    }
-
-    private List<String> buildDetectedSignals(MultimodalResponse response, boolean domainBrandMismatch) {
-        List<String> signals = new ArrayList<>();
-        if (response.credentialRequest()) signals.add("CREDENTIAL_REQUEST");
-        if (response.financialActionRequest()) signals.add("FINANCIAL_ACTION_REQUEST");
-        if (response.appInstallRequest()) signals.add("DOWNLOAD_REQUEST");
-        if (response.externalContactRequest()) signals.add("EXTERNAL_CONTACT");
-        if (response.impersonatedBrand() != null) signals.add("BRAND_IMPERSONATION");
-        if (domainBrandMismatch) signals.add("BRAND_DOMAIN_MISMATCH");
-        return signals;
-    }
-
-    private Map<String, Object> buildApproximateDomSummary(MultimodalResponse response) {
-        // multimodal-service 응답에는 원시 DOM 필드 개수가 없어 boolean 신호 기반으로
-        // 최소한만 채운다. Sandbox가 입력 필드 통계를 직접 넘겨주면 실측값으로 교체한다.
-        boolean hasForm = response.credentialRequest();
-
-        java.util.LinkedHashMap<String, Object> summary = new java.util.LinkedHashMap<>();
-        summary.put("passwordFields", hasForm ? 1 : 0);
-        summary.put("otpFields", 0);
-        summary.put("textFields", 0);
-        summary.put("formCount", hasForm ? 1 : 0);
-        summary.put("formMethod", hasForm ? "POST" : null);
-        summary.put("formAction", null);
-        summary.put("externalDomainLinks", response.externalContactRequest() ? 1 : 0);
-        summary.put("externalContactLinks", response.externalContactRequest() ? 1 : 0);
-        return summary;
-    }
-
-    private String extractHost(String url) {
-        if (url == null) return null;
-        try {
-            String host = java.net.URI.create(url).getHost();
-            return host != null ? host : url;
-        } catch (Exception e) {
-            return url;
-        }
     }
 
     private String writeJson(Object value) {
