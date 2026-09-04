@@ -24,6 +24,7 @@ SIGNAL_WEIGHTS = {
     "ACCOUNT_SUSPENSION_MESSAGE": 10,
     "BENEFIT_LURE": 6,
     "FINANCIAL_ACTION_REQUEST": 10,
+    # This rule signal means a brand candidate was found, not proven impersonation.
     "BRAND_IMPERSONATION": 1,
 }
 
@@ -44,17 +45,26 @@ OFFICIAL_SAFE_CAP = 20
 UNKNOWN_REASON = "페이지 정보를 충분히 수집하지 못해 위험 여부를 판단할 수 없습니다."
 
 AUTH_SIGNALS = {"PASSWORD_FIELD", "OTP_FIELD"}
-SENSITIVE_SIGNALS = {"RESIDENT_NUMBER_FIELD", "ACCOUNT_FIELD", "CARD_FIELD", "PIN_FIELD"}
+SENSITIVE_SIGNALS = {
+    "RESIDENT_NUMBER_FIELD", "ACCOUNT_FIELD", "CARD_FIELD", "PIN_FIELD"
+}
 CREDENTIAL_SIGNALS = {
     "PASSWORD_FIELD", "OTP_FIELD", "PHONE_FIELD", "RESIDENT_NUMBER_FIELD",
     "ACCOUNT_FIELD", "CARD_FIELD", "PIN_FIELD", "EMAIL_FIELD", "USER_ID_FIELD",
 }
-INDEPENDENT_HIGH_RISK = {"EXTERNAL_FORM_ACTION", "EXTERNAL_CONTACT", "DOWNLOAD_REQUEST", "FINANCIAL_ACTION_REQUEST"}
+INDEPENDENT_HIGH_RISK = {
+    "EXTERNAL_FORM_ACTION", "EXTERNAL_CONTACT", "DOWNLOAD_REQUEST",
+    "FINANCIAL_ACTION_REQUEST",
+}
 
 
 def collection_is_analyzable(collection_status: dict[str, Any] | None) -> bool:
+    """Collection errors are tolerated only when objective page facts remain."""
     status = collection_status or {}
-    return any(bool(status.get(key)) for key in ("html", "visible_text", "inputs", "forms", "links")) or bool(status.get("screenshot") and status.get("semantic_available"))
+    return any(
+        bool(status.get(key))
+        for key in ("html", "visible_text", "inputs", "forms", "links")
+    ) or bool(status.get("screenshot") and status.get("semantic_available"))
 
 
 def _score(signals: set[str]) -> int:
@@ -105,16 +115,17 @@ def _reasons(rule: dict[str, Any], signals: set[str], semantic: dict[str, Any] |
         reasons.append("비밀번호 입력 필드가 확인되었습니다.")
     elif "OTP_FIELD" in signals:
         reasons.append("OTP 인증번호 입력을 요구합니다.")
-    for signal, text in (
+    credential_templates = (
         ("RESIDENT_NUMBER_FIELD", "주민등록번호 입력을 요구합니다."),
         ("ACCOUNT_FIELD", "계좌번호 입력을 요구합니다."),
         ("CARD_FIELD", "카드번호 입력을 요구합니다."),
         ("PIN_FIELD", "PIN 또는 비밀번호 입력을 요구합니다."),
-    ):
+    )
+    for signal, text in credential_templates:
         if signal in signals:
             reasons.append(text)
             break
-    for signal, text in (
+    templates = (
         ("EXTERNAL_FORM_ACTION", "입력 정보가 현재 사이트와 다른 외부 도메인으로 전송될 수 있습니다."),
         ("EXTERNAL_CONTACT", "외부 상담 또는 메신저 채널로 이동을 유도합니다."),
         ("DOWNLOAD_REQUEST", "파일 또는 프로그램 다운로드를 유도하는 정황이 확인되었습니다."),
@@ -122,7 +133,8 @@ def _reasons(rule: dict[str, Any], signals: set[str], semantic: dict[str, Any] |
         ("URGENCY_MESSAGE", "즉시 행동을 요구하는 긴급성 문구가 확인되었습니다."),
         ("BENEFIT_LURE", "지원금·환급금·대출 등 금전적 혜택을 강조하는 문구가 확인되었습니다."),
         ("FINANCIAL_ACTION_REQUEST", "송금·이체·계좌정보 입력 등 금융 행동을 요구합니다."),
-    ):
+    )
+    for signal, text in templates:
         if signal in signals and text not in reasons:
             reasons.append(text)
         if len(reasons) >= 5:
@@ -137,11 +149,12 @@ def _reasons(rule: dict[str, Any], signals: set[str], semantic: dict[str, Any] |
     return reasons[:5] or ["분석 가능한 고위험 행동 신호가 발견되지 않았습니다."]
 
 
-def _confidence(signals: set[str], rule: dict[str, Any], semantic: dict[str, Any] | None, collection_status: dict[str, Any]) -> float:
-    completeness = sum(bool(collection_status.get(key)) for key in ("html", "visible_text", "inputs", "forms", "links", "status_code")) / 6
+def _confidence(signals: set[str], rule: dict[str, Any], semantic: dict[str, Any] | None,
+                collection_status: dict[str, Any]) -> float:
+    completeness = sum(bool(collection_status.get(key)) for key in
+                       ("html", "visible_text", "inputs", "forms", "links", "status_code")) / 6
     categories = sum(bool(signals & group) for group in (
-        CREDENTIAL_SIGNALS,
-        {"BRAND_DOMAIN_MISMATCH"},
+        CREDENTIAL_SIGNALS, {"BRAND_DOMAIN_MISMATCH"},
         {"URGENCY_MESSAGE", "ACCOUNT_SUSPENSION_MESSAGE", "BENEFIT_LURE"},
         INDEPENDENT_HIGH_RISK,
     ))
@@ -159,20 +172,17 @@ def _confidence(signals: set[str], rule: dict[str, Any], semantic: dict[str, Any
     return round(max(0.0, min(1.0, value)), 2)
 
 
-def fuse_analysis(rule_analysis: dict[str, Any], gemini_analysis: dict[str, Any] | None, collection_status: dict[str, Any]) -> dict[str, Any]:
+def fuse_analysis(rule_analysis: dict[str, Any], gemini_analysis: dict[str, Any] | None,
+                  collection_status: dict[str, Any]) -> dict[str, Any]:
     analysis_id = str(collection_status.get("analysis_id") or "unknown")
     if not collection_is_analyzable(collection_status):
         return {
-            "analysisId": analysis_id,
-            "pageRiskScore": 0,
-            "verdict": "UNKNOWN",
+            "analysisId": analysis_id, "pageRiskScore": 0, "verdict": "UNKNOWN",
             "impersonation": {"detected": False, "brand": None, "category": None},
             "credentialIntent": {"detected": False, "types": []},
             "domainAnalysis": {"currentDomain": None, "officialDomains": [], "domainBrandMismatch": False},
             "behaviorAnalysis": {"financialActionRequest": False, "externalContactRequest": False, "downloadRequest": False},
-            "detectedSignals": [],
-            "reasons": [UNKNOWN_REASON],
-            "confidence": 0.0,
+            "detectedSignals": [], "reasons": [UNKNOWN_REASON], "confidence": 0.0,
         }
 
     ordered_signals = list(rule_analysis.get("detectedSignals") or [])
