@@ -51,4 +51,28 @@ class PageAnalysisResponseTests {
         assertThat(response.detectedSignals()).contains("BRAND_DOMAIN_MISMATCH");
         assertThat(response.confidence()).isEqualTo(0.91);
     }
+
+    @Test
+    void remainsCompatibleWithFlatMultimodalResponseDuringTeamMerge() throws Exception {
+        String json = """
+                {
+                  "verdict": "PHISHING",
+                  "risk_score": 87,
+                  "impersonation_type": "FINANCIAL_INSTITUTION",
+                  "impersonated_brand": "KB국민은행",
+                  "credential_request": true,
+                  "financial_action_request": false,
+                  "app_install_request": false,
+                  "external_contact_request": true,
+                  "evidence": ["비공식 도메인에서 비밀번호 입력을 요구합니다."]
+                }
+                """;
+
+        PageAnalysisResponse response = objectMapper.readValue(json, PageAnalysisResponse.class);
+
+        assertThat(response.pageRiskScore()).isEqualTo(87);
+        assertThat(response.verdict()).isEqualTo("PHISHING");
+        assertThat(response.reasons())
+                .containsExactly("비공식 도메인에서 비밀번호 입력을 요구합니다.");
+    }
 }

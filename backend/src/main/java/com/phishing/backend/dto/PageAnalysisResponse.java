@@ -1,6 +1,7 @@
 package com.phishing.backend.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonAlias;
 
 import java.io.Serializable;
 import java.util.List;
@@ -8,6 +9,7 @@ import java.util.List;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record PageAnalysisResponse(
         String analysisId,
+        @JsonAlias("risk_score")
         Integer pageRiskScore,
         String verdict,
         Impersonation impersonation,
@@ -15,6 +17,7 @@ public record PageAnalysisResponse(
         DomainAnalysis domainAnalysis,
         BehaviorAnalysis behaviorAnalysis,
         List<String> detectedSignals,
+        @JsonAlias("evidence")
         List<String> reasons,
         Double confidence
 ) implements Serializable {

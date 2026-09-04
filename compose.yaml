@@ -170,7 +170,7 @@ services:
       MULTIMODAL_SERVICE_BASE_URL: http://multimodal-service:8002
       DB_API_BASE_URL: http://db-api:8081
       ANALYSIS_ARTIFACT_STORAGE_DIR: /data/analyses
-      PAGE_ANALYSIS_BASE_URL: http://page-ai-mock:8002
+      PAGE_ANALYSIS_BASE_URL: http://multimodal-service:8002
       URL_ANALYSIS_BASE_URL: http://url-ai-mock:8001
       ANALYSIS_JOB_STORAGE_DIR: /data/jobs
       MAX_CONCURRENT_ANALYSES: ${MAX_CONCURRENT_ANALYSES:-2}
