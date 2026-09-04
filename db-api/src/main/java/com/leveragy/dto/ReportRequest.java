@@ -9,9 +9,14 @@ public class ReportRequest {
 
     private String reason;
 
+    private Long analysisId;
+
     public String getUrl() { return url; }
     public void setUrl(String url) { this.url = url; }
 
     public String getReason() { return reason; }
     public void setReason(String reason) { this.reason = reason; }
+
+    public Long getAnalysisId() { return analysisId; }
+    public void setAnalysisId(Long analysisId) { this.analysisId = analysisId; }
 }

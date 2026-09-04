@@ -20,6 +20,11 @@ export default defineConfig({
         target: `http://localhost:${process.env.DB_API_PORT || 8081}`,
         changeOrigin: true,
       },
+      // 관리자 로그인도 제보/분석 저장과 같은 db-api가 담당
+      "/api/admin": {
+        target: `http://localhost:${process.env.DB_API_PORT || 8081}`,
+        changeOrigin: true,
+      },
     },
   },
 });

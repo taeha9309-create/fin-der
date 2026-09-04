@@ -1,38 +1,41 @@
-const RADIUS = 45;
-const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
-
-// finalResult 판정 기준(70/40)과 맞춘 색상 구간
-function riskColor(score) {
-  if (score >= 70) return "var(--color-danger, #e63946)";
-  if (score >= 40) return "var(--color-warning, #a67c00)";
-  return "var(--color-safe, #2d6a4f)";
-}
-
-export default function RiskGauge({ score }) {
-  const clamped = Math.max(0, Math.min(100, score ?? 0));
-  const offset = CIRCUMFERENCE * (1 - clamped / 100);
-  const color = riskColor(clamped);
+export default function RiskGauge({ score, tone = "danger", size = 64 }) {
+  const strokeWidth = 6;
+  const r = (size - strokeWidth) / 2;
+  const c = 2 * Math.PI * r;
+  const clamped = Math.max(0, Math.min(100, Math.round(score)));
+  const offset = c * (1 - clamped / 100);
 
   return (
     <div className="risk-gauge">
-      <svg viewBox="0 0 100 100" className="risk-gauge-svg" role="img" aria-label={`위험도 ${clamped}/100`}>
-        <circle cx="50" cy="50" r={RADIUS} className="risk-gauge-track" />
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
         <circle
-          cx="50"
-          cy="50"
-          r={RADIUS}
-          className="risk-gauge-fill"
-          style={{
-            stroke: color,
-            strokeDasharray: CIRCUMFERENCE,
-            strokeDashoffset: offset,
-          }}
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          className="gauge-track"
+          strokeWidth={strokeWidth}
+          fill="none"
         />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          className={`gauge-value tone-${tone}`}
+          strokeWidth={strokeWidth}
+          fill="none"
+          strokeLinecap="round"
+          strokeDasharray={c}
+          strokeDashoffset={offset}
+          transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        />
+        <text x="50%" y="46%" textAnchor="middle" className="gauge-score">
+          {clamped}
+        </text>
+        <text x="50%" y="66%" textAnchor="middle" className="gauge-unit">
+          /100
+        </text>
       </svg>
-      <div className="risk-gauge-label">
-        <strong style={{ color }}>{clamped}</strong>
-        <span>/ 100</span>
-      </div>
+      <div className="risk-score-label">위험도</div>
     </div>
   );
 }

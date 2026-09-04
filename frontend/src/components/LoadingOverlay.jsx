@@ -1,29 +1,40 @@
 import { useEffect, useState } from "react";
 
-// 백엔드가 진행률을 안 주기 때문에(단일 요청-응답), 실제 파이프라인 순서에
-// 맞춰 일정 시간마다 문구만 바꿔준다. 진짜 진행률이 아니라 사용자가 기다리는
-// 동안 뭘 하고 있는지 짐작할 수 있게 하는 용도.
-const STEPS = [
-  "URL 구조 분석 중 (XGBoost)...",
-  "의심스러우면 격리 환경에서 페이지 확인 중 (Sandbox)...",
-  "AI가 사칭 여부 판단 중 (Multimodal)...",
-  "최종 위험도 계산 중...",
+const PIPELINE_STEPS = [
+  "1차 URL 분석 (XGBoost)",
+  "웹페이지 수집 (Sandbox)",
+  "페이지 위험요소 분석",
+  "최종 결과 생성",
 ];
 
-export default function LoadingOverlay() {
-  const [stepIndex, setStepIndex] = useState(0);
+export default function LoadingOverlay({ active, label = "AI가 URL을 분석하고 있습니다…" }) {
+  const [activeStep, setActiveStep] = useState(0);
 
   useEffect(() => {
+    if (!active) {
+      setActiveStep(0);
+      return;
+    }
     const timer = setInterval(() => {
-      setStepIndex((prev) => Math.min(prev + 1, STEPS.length - 1));
-    }, 1800);
+      setActiveStep((i) => (i + 1) % PIPELINE_STEPS.length);
+    }, 1100);
     return () => clearInterval(timer);
-  }, []);
+  }, [active]);
+
+  if (!active) return null;
 
   return (
-    <div className="loading-overlay">
-      <div className="loading-spinner" aria-hidden="true" />
-      <p className="loading-text">{STEPS[stepIndex]}</p>
+    <div className="loading-wrap">
+      <div className="spinner" />
+      <div className="loading-title">{label}</div>
+      <div className="pipeline">
+        {PIPELINE_STEPS.map((step, i) => (
+          <div key={step} className={"pstep" + (i === activeStep ? " active" : "")}>
+            <span className="pdot" />
+            {step}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
