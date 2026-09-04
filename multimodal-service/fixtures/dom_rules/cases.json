@@ -1,0 +1,32 @@
+{
+  "official_bank": {
+    "final_url": "https://www.kbstar.com/",
+    "title": "KB국민은행",
+    "page_text": "KB국민은행 로그인",
+    "inputs": [{"type": "password", "label": "비밀번호"}]
+  },
+  "fake_bank": {
+    "final_url": "https://kb-secure.example/login",
+    "title": "KB국민은행 보안 인증",
+    "page_text": "30분 이내 인증하지 않으면 계좌가 정지됩니다.",
+    "inputs": [{"type": "password"}, {"type": "text", "label": "OTP 인증번호"}]
+  },
+  "generic_login": {
+    "final_url": "https://example.com/login",
+    "page_text": "일반 서비스 로그인",
+    "inputs": [{"type": "password"}]
+  },
+  "government_benefit": {
+    "final_url": "https://benefit.example/apply",
+    "page_text": "정부지원금 신청 오늘까지 신청 계좌번호 입력",
+    "inputs": [{"type": "text", "name": "account_number"}]
+  },
+  "external_contact": {
+    "final_url": "https://example.com/",
+    "links": [{"text": "카카오톡 상담", "href": "https://open.kakao.com/o/safe-fixture"}]
+  },
+  "download": {
+    "final_url": "https://example.com/",
+    "network": {"download_detected": true}
+  }
+}
