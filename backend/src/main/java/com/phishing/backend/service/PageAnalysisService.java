@@ -23,7 +23,7 @@ public class PageAnalysisService {
 
     public Mono<PageAnalysisResponse> analyze(SandboxResponse sandboxResponse) {
         return pageAnalysisWebClient.post()
-                .uri("/analyze")
+                .uri("/v1/analyze")
                 .bodyValue(sandboxResponse)
                 .retrieve()
                 .bodyToMono(PageAnalysisResponse.class)

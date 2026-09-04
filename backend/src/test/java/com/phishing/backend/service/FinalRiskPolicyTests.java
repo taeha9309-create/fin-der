@@ -84,8 +84,12 @@ class FinalRiskPolicyTests {
             int score, String verdict, List<String> signals, List<String> reasons
     ) {
         return new PageAnalysisResponse(
-                "analysis-id", "MODEL", score, verdict, null, false,
-                List.of(), false, signals, reasons, 0.8
+                "analysis-id", score, verdict,
+                new PageAnalysisResponse.Impersonation(false, null, null),
+                new PageAnalysisResponse.CredentialIntent(false, List.of()),
+                new PageAnalysisResponse.DomainAnalysis(null, List.of(), false),
+                new PageAnalysisResponse.BehaviorAnalysis(false, false, false),
+                signals, reasons, 0.8
         );
     }
 }
