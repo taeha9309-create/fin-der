@@ -94,3 +94,55 @@ def test_brand_detection_does_not_join_separate_text_sources():
 def test_registrable_domain_handles_korean_suffixes_and_subdomains():
     assert registrable_domain("https://card.nonghyup.com") == "nonghyup.com"
     assert registrable_domain("https://service.ibk.co.kr") == "ibk.co.kr"
+
+
+def test_brand_mention_keeps_candidate_without_impersonation_signals():
+    result = analyze_dom_risk({
+        "final_url": "https://news.example.com/article",
+        "page_text": "KB국민은행의 예금 금리를 비교합니다.",
+        "inputs": [], "forms": [], "links": [], "dom_signals": {},
+    })
+    assert result["impersonation"]["brand"] == "KB국민은행"
+    assert result["impersonation"]["detected"] is False
+    assert "BRAND_IMPERSONATION" not in result["detectedSignals"]
+    assert "BRAND_DOMAIN_MISMATCH" not in result["detectedSignals"]
+
+
+def test_comparison_page_can_keep_multiple_candidates_without_impersonation():
+    result = analyze_dom_risk({
+        "final_url": "https://finance.example.com/cards",
+        "page_text": "신한카드와 현대카드 혜택을 비교합니다.",
+        "inputs": [], "forms": [], "links": [], "dom_signals": {},
+    })
+    brands = {candidate["brand"] for candidate in result["impersonation"]["candidateBrands"]}
+    assert {"신한카드", "현대카드"} <= brands
+    assert result["impersonation"]["detected"] is False
+    assert "BRAND_DOMAIN_MISMATCH" not in result["detectedSignals"]
+
+
+def test_synthetic_bank_impersonation_still_has_mismatch():
+    result = analyze_dom_risk({
+        "final_url": "https://kb-auth.test.invalid/",
+        "title": "KB국민은행 보안 인증",
+        "inputs": [{"type": "password"}, {"name": "otp"}],
+        "forms": [{"method": "POST", "action": "https://collector.test.invalid/submit"}],
+        "links": [], "dom_signals": {},
+    })
+    assert result["impersonation"]["brand"] == "KB국민은행"
+    assert result["impersonation"]["detected"] is True
+    assert {"BRAND_IMPERSONATION", "BRAND_DOMAIN_MISMATCH"} <= set(result["detectedSignals"])
+
+
+def test_government_mention_and_synthetic_impersonation_are_separated():
+    mention = analyze_dom_risk({"final_url": "https://news.example.com/tax",
+        "page_text": "국세청이 새로운 세금 신고 일정을 발표했습니다.",
+        "inputs": [], "forms": [], "links": [], "dom_signals": {}})
+    phishing = analyze_dom_risk({"final_url": "https://refund.test.invalid/",
+        "page_text": "국세청 환급금 지급을 위해 본인 인증이 필요합니다.",
+        "inputs": [{"name": "account_number"}],
+        "forms": [{"method": "POST", "action": "/claim"}], "links": [], "dom_signals": {}})
+    assert mention["impersonation"]["brand"] == "국세청"
+    assert mention["impersonation"]["detected"] is False
+    assert "BRAND_DOMAIN_MISMATCH" not in mention["detectedSignals"]
+    assert phishing["impersonation"]["detected"] is True
+    assert "BRAND_DOMAIN_MISMATCH" in phishing["detectedSignals"]

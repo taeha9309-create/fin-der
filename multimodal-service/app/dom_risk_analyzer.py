@@ -45,6 +45,13 @@ TEXT_SIGNALS = {
 CONTACT_PATTERNS = ("kakao", "카카오톡", "telegram", "텔레그램", "open.kakao.com", "t.me", "whatsapp", "line", "상담", "문의")
 DOWNLOAD_SUFFIXES = {".apk", ".exe", ".msi", ".dmg", ".pkg", ".zip"}
 MULTIPART_SUFFIXES = ("co.kr", "or.kr", "go.kr", "ne.kr", "ac.kr", "re.kr")
+AUTH_ACTION_PATTERNS = ("login", "log in", "authenticate", "authentication", "verification", "로그인", "인증", "본인확인")
+IMPERSONATION_BEHAVIOR_SIGNALS = {
+    "PASSWORD_FIELD", "OTP_FIELD", "RESIDENT_NUMBER_FIELD", "ACCOUNT_FIELD",
+    "CARD_FIELD", "PIN_FIELD", "POST_FORM", "EXTERNAL_FORM_ACTION",
+    "EXTERNAL_CONTACT", "DOWNLOAD_REQUEST", "URGENCY_MESSAGE",
+    "ACCOUNT_SUSPENSION_MESSAGE", "BENEFIT_LURE", "FINANCIAL_ACTION_REQUEST",
+}
 
 
 def _normalized(value: object) -> str:
@@ -105,7 +112,7 @@ def analyze_dom_risk(input_data: dict) -> dict:
     primary = candidates[0] if candidates else None
     current_domain = registrable_domain(final_url)
     official_domains = list(primary["officialDomains"]) if primary else []
-    mismatch = bool(primary and current_domain and official_domains and all(current_domain != registrable_domain(domain) for domain in official_domains))
+    domain_context_mismatch = bool(primary and current_domain and official_domains and all(current_domain != registrable_domain(domain) for domain in official_domains))
 
     credential_types = _credential_types(inputs, forms)
     found_signals = {CREDENTIAL_SIGNALS[item] for item in credential_types}
@@ -140,17 +147,21 @@ def analyze_dom_risk(input_data: dict) -> dict:
         download_detected = any(Path(urlparse(str(link.get("href") or link.get("destination") or "")).path).suffix.casefold() in DOWNLOAD_SUFFIXES for link in links)
     if download_detected:
         found_signals.add("DOWNLOAD_REQUEST")
-    if primary:
-        found_signals.add("BRAND_IMPERSONATION")
-    if mismatch:
-        found_signals.add("BRAND_DOMAIN_MISMATCH")
     for signal, patterns in TEXT_SIGNALS.items():
         if any(_normalized(pattern) in normalized_text for pattern in patterns):
             found_signals.add(signal)
+    has_authentication_ui = any(pattern in full_text.casefold() for pattern in AUTH_ACTION_PATTERNS)
+    has_impersonation_evidence = bool(found_signals & IMPERSONATION_BEHAVIOR_SIGNALS) or has_authentication_ui
+    impersonation = bool(primary and domain_context_mismatch and has_impersonation_evidence)
+    mismatch = bool(domain_context_mismatch and impersonation)
+    if impersonation:
+        found_signals.add("BRAND_IMPERSONATION")
+    if mismatch:
+        found_signals.add("BRAND_DOMAIN_MISMATCH")
 
     return {
         "impersonation": {
-            "detected": primary is not None,
+            "detected": impersonation,
             "brand": primary["brand"] if primary else None,
             "category": primary["category"] if primary else None,
             "matchedAliases": primary["matchedAliases"] if primary else [],
