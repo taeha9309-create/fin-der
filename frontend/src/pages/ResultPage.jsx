@@ -91,13 +91,42 @@ export default function ResultPage() {
     );
   }
 
+  const riskScore = analysis.riskScore ?? 0;
+
+  if (riskScore <= 10) {
+    return (
+      <div className="page result-page">
+        <div className="safe-result">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="safe-result-icon">
+            <path d="M20 6 9 17l-5-5" />
+          </svg>
+          <h1 className="safe-result-title">안전한 사이트입니다</h1>
+          <a className="analyzed-url mono" href={analysis.url} target="_blank" rel="noopener noreferrer">
+            {analysis.url}
+          </a>
+          <div className="meta-row mono">
+            <span>분석 시간 {formatDate(analysis.createdAt)}</span>
+            <span>분석 ID {analysis.id}</span>
+          </div>
+          <div className="action-row">
+            <button className="btn btn-ghost btn-small" onClick={handleShare}>
+              {shared ? "링크 복사됨" : "결과 공유"}
+            </button>
+            <Link to={`/report/${analysis.id}`} className="btn btn-danger">
+              🚩 이 사이트 제보하기
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const xaiReasons = safeParseReasons(analysis.xaiResult);
   const pageAnalysis = safeParsePageAnalysis(analysis.multimodalResult);
   const collectionSummary = safeParseCollectionSummary(analysis.multimodalResult);
   const collectionStatusMessage = buildCollectionStatusMessage(collectionSummary);
   const verdict = analysis.finalResult || "NORMAL";
   const meta = VERDICT_META[verdict] || VERDICT_META.NORMAL;
-  const riskScore = analysis.riskScore ?? 0;
   const riskSummary = buildRiskSummary(pageAnalysis);
   const reasons = pageAnalysis?.reasons?.length ? pageAnalysis.reasons : xaiReasons;
 
