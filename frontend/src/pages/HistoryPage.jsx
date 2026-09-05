@@ -48,7 +48,12 @@ export default function HistoryPage() {
         <ul className="history-list">
           {analyses.map((item) => (
             <li key={item.id} className="panel-card">
-              <Link to={`/result/${item.id}`} className="history-link">
+              <Link
+                to={`/result/${item.id}`}
+                className="history-link"
+                draggable="false"
+                onDragStart={(e) => e.preventDefault()}
+              >
                 <div className="history-main">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M14 4h6v6M20 4 10 14M9 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-3" />

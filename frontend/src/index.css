@@ -459,6 +459,35 @@ body {
   color: var(--primary);
 }
 
+.safe-result {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+  padding: 56px 24px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent);
+  background: var(--primary-soft);
+}
+
+.safe-result-icon {
+  width: 48px;
+  height: 48px;
+  color: var(--primary);
+}
+
+.safe-result-title {
+  font-family: "Sora", sans-serif;
+  font-weight: 700;
+  font-size: 24px;
+  margin: 4px 0 0;
+}
+
+.safe-result .action-row {
+  margin-top: 18px;
+}
+
 .risk-banner-title {
   font-family: "Sora", sans-serif;
   font-weight: 700;
@@ -1064,6 +1093,8 @@ dl.info dd {
   padding: 13px 15px;
   text-decoration: none;
   color: var(--text);
+  user-select: none;
+  -webkit-user-drag: none;
 }
 
 .history-main {
