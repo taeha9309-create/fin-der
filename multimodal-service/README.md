@@ -47,7 +47,7 @@ Docker Compose에서는 저장소 루트의 `.env`에 `GEMINI_API_KEY`를 설정
 }
 ```
 
-Screenshot과 HTML/Text가 모두 없으면 Gemini를 호출하지 않고 `UNKNOWN`을 반환합니다. 분석 자료가 있지만 API 키가 없으면 503, Base64가 잘못되면 422, Gemini 호출 또는 응답 검증 실패는 502입니다. 요청별 오류는 격리되어 서버 프로세스를 종료하지 않습니다.
+Screenshot과 HTML/Text가 모두 없으면 Gemini를 호출하지 않고 `UNKNOWN`을 반환합니다. 분석 자료가 있지만 API 키가 없거나 Gemini 호출이 실패하면 DOM 규칙 기반 결과를 반환하고, Base64가 잘못되면 422를 반환합니다. 요청별 오류는 격리되어 서버 프로세스를 종료하지 않습니다.
 
 HTML에서는 script를 실행하지 않고 다음 정보만 추출합니다.
 

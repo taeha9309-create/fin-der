@@ -51,7 +51,7 @@ docker compose ps
 powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test.ps1
 ```
 
-`.env`와 모델 artifact는 `.gitignore` 대상입니다. 키가 없으면 멀티모달 API는 가짜 결과를 만들지 않고 503을 반환하며, 전체 분석 요청은 ML 결과로 완료됩니다.
+`.env`와 모델 artifact는 `.gitignore` 대상입니다. 키가 없으면 멀티모달 서비스는 DOM 규칙 기반 대체 분석을 사용합니다.
 
 Backend와 Sandbox의 요청·응답 규격은
 [Backend / Sandbox API](docs/backend-sandbox-api.md)에서 확인할 수 있습니다.
@@ -119,7 +119,7 @@ cd .\multimodal-service
 python .\run_fixture_tests.py normal_bank non_financial fake_bank card_capital internet_bank government_support
 ```
 
-키가 없으면 위 fixture 실행을 건너뛰고 API의 503 fallback을 smoke test로 검증합니다. 키 값 자체를 로그나 결과 파일에 기록하지 마십시오.
+키가 없으면 위 fixture 실행을 건너뛰고 DOM 규칙 기반 대체 분석을 smoke test로 검증합니다. 키 값 자체를 로그나 결과 파일에 기록하지 마십시오.
 
 ## 멀티모달 HTTP 계약
 

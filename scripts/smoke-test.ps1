@@ -53,13 +53,24 @@ function Wait-BackendReady {
 function Invoke-IntegratedAnalysis {
     param([string]$Url)
     $body = @{ url = $Url } | ConvertTo-Json
-    $result = Invoke-RestMethod -Uri $syncApiUrl -Method Post -ContentType "application/json" -Body $body -TimeoutSec 75
+    $pending = Invoke-RestMethod -Uri $syncApiUrl -Method Post -ContentType "application/json" -Body $body -TimeoutSec 15
+    Assert-True ($null -ne $pending.id) "분석 시작 응답에 id 필드가 없습니다."
+    Assert-True ($pending.url -eq $Url) "분석 시작 응답의 URL이 요청값과 일치하지 않습니다."
+
+    $deadline = (Get-Date).AddSeconds($pollTimeoutSeconds)
+    $result = $null
+    do {
+        Start-Sleep -Milliseconds 500
+        $result = Invoke-RestMethod -Uri "$dbApiUrl/analyze/$($pending.id)" -TimeoutSec 15
+    } while ($result.processingStatus -eq "PROCESSING" -and (Get-Date) -lt $deadline)
+
+    Assert-True ($result.processingStatus -ne "PROCESSING") "실제 통합 분석이 ${pollTimeoutSeconds}초 안에 완료되지 않았습니다."
+    Assert-True ($result.processingStatus -eq "COMPLETED") "실제 통합 분석이 실패했습니다. 실제 상태: $($result.processingStatus)"
     foreach ($field in @("id", "riskScore", "finalResult", "mlResult", "multimodalResult", "xaiResult")) {
         Assert-True ($null -ne $result.$field -and -not [string]::IsNullOrWhiteSpace([string]$result.$field)) "분석 응답에 $field 필드가 없습니다."
     }
-    $stored = Invoke-RestMethod -Uri "$dbApiUrl/analyze/$($result.id)" -TimeoutSec 15
-    Assert-True ($stored.id -eq $result.id -and $stored.url -eq $Url) "DB 저장 후 조회한 결과가 분석 응답과 일치하지 않습니다."
-    return $stored
+    Assert-True ($result.id -eq $pending.id -and $result.url -eq $Url) "DB 저장 후 조회한 결과가 분석 시작 응답과 일치하지 않습니다."
+    return $result
 }
 
 function Wait-AnalysisJob {
@@ -144,8 +155,9 @@ try {
     Assert-True ($jobResult.result.artifacts.html -eq "/api/analyses/$($job.analysisId)/html") "HTML 조회 URL이 올바르지 않습니다."
     Assert-True ($jobResult.result.artifacts.screenshot -eq "/api/analyses/$($job.analysisId)/screenshot") "Screenshot 조회 URL이 올바르지 않습니다."
     Assert-True ($jobResult.pageAnalysis.analysisId -eq $job.analysisId) "Backend와 페이지 AI의 analysisId가 일치하지 않습니다."
-    Assert-True ($jobResult.pageAnalysis.serviceMode -eq "MOCK") "페이지 AI 모의 서비스 결과가 아닙니다."
-    Assert-True ($jobResult.finalAnalysis.policyMode -eq "TEMPORARY") "임시 최종 점수 정책이 적용되지 않았습니다."
+    Assert-True ($null -ne $jobResult.pageAnalysis.pageRiskScore) "페이지 AI 위험 점수가 반환되지 않았습니다."
+    Assert-True ($null -ne $jobResult.pageAnalysis.credentialIntent) "페이지 AI 인증정보 의도 결과가 반환되지 않았습니다."
+    Assert-True ($jobResult.finalAnalysis.policyVersion -eq "final-fusion-v1") "최종 점수 정책 버전이 올바르지 않습니다."
     Assert-True ($jobResult.finalAnalysis.riskScore -ge 0 -and $jobResult.finalAnalysis.riskScore -le 100) "최종 위험 점수 범위가 올바르지 않습니다."
     Assert-ContainerFile "backend" "/data/jobs/$($job.analysisId).job" "Job"
 
@@ -172,18 +184,29 @@ try {
     Assert-True ($blockedError.schemaVersion -eq "1.0" -and $blockedError.collectionStatus -eq "FAILED") "차단 응답 계약이 올바르지 않습니다."
     Assert-True (-not [string]::IsNullOrWhiteSpace($blockedError.analysisId)) "차단 응답에 analysisId가 없습니다."
 
-    Write-Host "[9/11] Gemini 설정 또는 503 대체 응답 확인"
+    Write-Host "[9/11] Gemini 설정 또는 DOM 규칙 기반 대체 분석 확인"
     $multimodalHealth = Invoke-RestMethod -Uri "http://localhost:$multimodalPort/health" -TimeoutSec 15
     if (-not $multimodalHealth.gemini_api_key_configured) {
-        $fallbackVerified = $false
-        try {
-            $pixel = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
-            $multimodalBody = @{ url = "https://example.com"; screenshot_base64 = $pixel; html = "<html><body>safe fixture</body></html>" } | ConvertTo-Json
-            Invoke-RestMethod -Uri "http://localhost:$multimodalPort/v1/analyze" -Method Post -ContentType "application/json" -Body $multimodalBody -TimeoutSec 15
-        } catch {
-            if ([int]$_.Exception.Response.StatusCode -eq 503) { $fallbackVerified = $true }
-        }
-        Assert-True $fallbackVerified "GEMINI_API_KEY 미설정 시 503 대체 응답을 확인하지 못했습니다."
+        $ruleOnlyBody = @{
+            analysisId = "smoke-rule-only"
+            requestedUrl = "https://example.com"
+            finalUrl = "https://example.com"
+            statusCode = 200
+            page = @{
+                title = "Example Domain"
+                visibleText = "safe fixture"
+                html = "<html><body>safe fixture</body></html>"
+            }
+            inputs = @()
+            forms = @()
+            links = @()
+            network = @{}
+            redirectChain = @()
+        } | ConvertTo-Json -Depth 8
+        $ruleOnlyResult = Invoke-RestMethod -Uri "http://localhost:$multimodalPort/v1/analyze" -Method Post -ContentType "application/json" -Body $ruleOnlyBody -TimeoutSec 15
+        Assert-True ($ruleOnlyResult.analysisId -eq "smoke-rule-only") "DOM 규칙 기반 분석의 analysisId가 일치하지 않습니다."
+        Assert-True ($null -ne $ruleOnlyResult.pageRiskScore) "DOM 규칙 기반 위험 점수가 반환되지 않았습니다."
+        Assert-True (@("NORMAL", "SUSPICIOUS", "PHISHING", "UNKNOWN") -contains $ruleOnlyResult.verdict) "DOM 규칙 기반 판정값이 올바르지 않습니다."
     }
 
     Write-Host "[10/11] 사용자 제보 API 확인"
