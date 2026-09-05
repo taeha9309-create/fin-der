@@ -93,6 +93,8 @@ export default function ResultPage() {
 
   const xaiReasons = safeParseReasons(analysis.xaiResult);
   const pageAnalysis = safeParsePageAnalysis(analysis.multimodalResult);
+  const collectionSummary = safeParseCollectionSummary(analysis.multimodalResult);
+  const collectionStatusMessage = buildCollectionStatusMessage(collectionSummary);
   const verdict = analysis.finalResult || "NORMAL";
   const meta = VERDICT_META[verdict] || VERDICT_META.NORMAL;
   const riskScore = analysis.riskScore ?? 0;
@@ -171,7 +173,7 @@ export default function ResultPage() {
               <div className="preview-caption">* 실제 스크린샷은 Sandbox 연동 후 제공되는 예시 화면입니다.</div>
             </div>
           ) : (
-            <p className="body-muted">Sandbox가 페이지를 안전하게 수집하면 분석 당시 화면이 여기에 표시됩니다.</p>
+            <p className="body-muted">{collectionStatusMessage}</p>
           )}
         </div>
 
@@ -194,7 +196,7 @@ export default function ResultPage() {
             </div>
           ) : (
             <p className="body-muted">
-              {pageAnalysis ? "감지된 위험 신호가 없습니다." : "분석 위험도가 낮아 Sandbox가 실행되지 않았습니다."}
+              {pageAnalysis ? "감지된 위험 신호가 없습니다." : collectionStatusMessage}
             </p>
           )}
         </div>
@@ -241,7 +243,7 @@ export default function ResultPage() {
               </div>
             </>
           ) : (
-            <p className="body-muted">입력 필드·Form·외부 연결 정보가 Sandbox 연동 후 표시됩니다.</p>
+            <p className="body-muted">{collectionStatusMessage}</p>
           )}
         </div>
 
@@ -382,6 +384,28 @@ function safeParsePageAnalysis(multimodalResult) {
   } catch {
     return null;
   }
+}
+
+function safeParseCollectionSummary(multimodalResult) {
+  try {
+    const parsed = JSON.parse(multimodalResult);
+    return parsed && typeof parsed.collected === "boolean" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function buildCollectionStatusMessage(summary) {
+  if (!summary) return "Sandbox 페이지 수집 결과가 없습니다.";
+  if (summary.note === "not_required") {
+    return "정밀 분석 설정을 켜기 전에 생성된 결과입니다. URL을 다시 분석해주세요.";
+  }
+  if (summary.collected === false) {
+    return summary.note
+      ? `Sandbox가 페이지를 수집하지 못했습니다. URL AI 결과만 표시합니다. (${summary.note})`
+      : "Sandbox가 페이지를 수집하지 못했습니다. URL AI 결과만 표시합니다.";
+  }
+  return "Sandbox 페이지 수집은 완료됐지만 표시할 정밀 분석 결과가 없습니다.";
 }
 
 function formatDate(iso) {

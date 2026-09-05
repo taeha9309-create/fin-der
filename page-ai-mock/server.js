@@ -37,16 +37,31 @@ function analyze(input) {
   const uniqueSignals = [...new Set(signals)];
   const score = Math.min(uniqueSignals.length * 20, 80);
   const verdict = score >= 60 ? "SUSPICIOUS" : "UNKNOWN";
+  const hasCredentialIntent = credentialTypes.length > 0;
 
   return {
     analysisId: input.analysisId,
-    serviceMode: "MOCK",
     pageRiskScore: score,
     verdict,
-    impersonatedBrand: null,
-    credentialIntent: credentialTypes.length > 0,
-    credentialTypes: [...new Set(credentialTypes)],
-    domainBrandMismatch: null,
+    impersonation: {
+      detected: false,
+      brand: null,
+      category: null,
+    },
+    credentialIntent: {
+      detected: hasCredentialIntent,
+      types: [...new Set(credentialTypes)],
+    },
+    domainAnalysis: {
+      currentDomain: null,
+      officialDomains: [],
+      domainBrandMismatch: false,
+    },
+    behaviorAnalysis: {
+      financialActionRequest: hasCredentialIntent,
+      externalContactRequest: false,
+      downloadRequest: Boolean(input.network?.downloadDetected),
+    },
     detectedSignals: uniqueSignals,
     reasons: uniqueSignals.map((signal) => `연동 테스트 신호: ${signal}`),
     confidence: 0.2,
@@ -58,7 +73,7 @@ const server = http.createServer((request, response) => {
     return sendJson(response, 200, { status: "UP", service: "page-ai-mock" });
   }
 
-  if (request.method !== "POST" || request.url !== "/analyze") {
+  if (request.method !== "POST" || !["/analyze", "/v1/analyze"].includes(request.url)) {
     return sendJson(response, 404, { code: "NOT_FOUND", message: "요청 경로를 찾을 수 없습니다." });
   }
 
