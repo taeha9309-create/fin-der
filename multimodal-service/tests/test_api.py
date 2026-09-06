@@ -6,7 +6,7 @@ sys.path.insert(0, str(SERVICE_DIR / "app"))
 import main
 from schemas import AnalyzeResponse
 client = TestClient(main.app)
-OUTPUT_FIELDS = {"analysisId", "pageRiskScore", "verdict", "impersonation", "credentialIntent", "domainAnalysis", "behaviorAnalysis", "detectedSignals", "reasons", "confidence"}
+OUTPUT_FIELDS = {"analysisId", "pageRiskScore", "verdict", "impersonation", "credentialIntent", "domainAnalysis", "behaviorAnalysis", "domSummary", "detectedSignals", "reasons", "confidence"}
 
 def test_health_does_not_require_api_key(monkeypatch):
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)

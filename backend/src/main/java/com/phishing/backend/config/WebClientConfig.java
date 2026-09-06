@@ -69,8 +69,17 @@ public class WebClientConfig {
     public WebClient dbApiWebClient(
             @Value("${db-api.base-url}") String dbApiBaseUrl
     ) {
+        // PATCH/GET responses echo back the stored record, which includes the
+        // base64 screenshotData (can exceed Spring's 256KB default buffer).
+        ExchangeStrategies strategies = ExchangeStrategies.builder()
+                .codecs(configurer ->
+                        configurer.defaultCodecs().maxInMemorySize(25 * 1024 * 1024)
+                )
+                .build();
+
         return WebClient.builder()
                 .baseUrl(dbApiBaseUrl)
+                .exchangeStrategies(strategies)
                 .build();
     }
 

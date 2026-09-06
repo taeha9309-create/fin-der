@@ -92,6 +92,52 @@ def _credential_types(inputs: list[dict], forms: list[dict]) -> list[str]:
     return [item for item in CREDENTIAL_SIGNALS if item in found]
 
 
+def _dom_summary(inputs: list[dict], forms: list[dict], links: list[dict], current_domain: str | None) -> dict:
+    password_fields = 0
+    otp_fields = 0
+    text_fields = 0
+    for item in inputs:
+        input_type = _normalized(item.get("type"))
+        if input_type == "password":
+            password_fields += 1
+            continue
+        searchable = _normalized(" ".join(str(item.get(key) or "") for key in ("type", "name", "id", "placeholder", "label", "autocomplete")))
+        if any(_normalized(pattern) in searchable for pattern in CREDENTIAL_PATTERNS["OTP"]):
+            otp_fields += 1
+            continue
+        text_fields += 1
+
+    first_form = forms[0] if forms else {}
+    form_method = str(first_form.get("method")).upper() if first_form.get("method") else None
+    form_action = first_form.get("action")
+
+    external_domain_links = 0
+    external_contact_links = 0
+    for link in links:
+        href = str(link.get("href") or link.get("destination") or "")
+        label = str(link.get("text") or "")
+        link_domain = registrable_domain(href)
+        if link_domain and current_domain and link_domain != current_domain:
+            external_domain_links += 1
+        contact_text = f"{label} {href}".casefold()
+        contact_hint = any(pattern in contact_text for pattern in CONTACT_PATTERNS)
+        contact_scheme = urlparse(href).scheme.casefold() in {"tel", "sms"}
+        contact_host = (urlparse(href).hostname or "").casefold() in {"open.kakao.com", "t.me", "wa.me"}
+        if contact_scheme or contact_host or (contact_hint and link_domain not in {None, current_domain}):
+            external_contact_links += 1
+
+    return {
+        "passwordFields": password_fields,
+        "otpFields": otp_fields,
+        "textFields": text_fields,
+        "formCount": len(forms),
+        "formMethod": form_method,
+        "formAction": form_action,
+        "externalDomainLinks": external_domain_links,
+        "externalContactLinks": external_contact_links,
+    }
+
+
 def analyze_dom_risk(input_data: dict) -> dict:
     final_url = input_data.get("final_url") or input_data.get("original_url") or ""
     inputs = input_data.get("inputs") or []
@@ -184,4 +230,5 @@ def analyze_dom_risk(input_data: dict) -> dict:
         },
         "detectedSignals": [signal for signal in SIGNAL_ORDER if signal in found_signals],
         "evidenceMetadata": {"externalFormActions": external_form_actions, "externalContacts": external_contacts},
+        "domSummary": _dom_summary(inputs, forms, links, current_domain),
     }

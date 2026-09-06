@@ -56,6 +56,15 @@ class BehaviorAnalysis(BaseModel):
     financialActionRequest: bool
     externalContactRequest: bool
     downloadRequest: bool
+class DomSummary(BaseModel):
+    passwordFields: int = 0
+    otpFields: int = 0
+    textFields: int = 0
+    formCount: int = 0
+    formMethod: str | None = None
+    formAction: str | None = None
+    externalDomainLinks: int = 0
+    externalContactLinks: int = 0
 class AnalyzeResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
     analysisId: str
@@ -65,6 +74,7 @@ class AnalyzeResponse(BaseModel):
     credentialIntent: CredentialIntent
     domainAnalysis: DomainAnalysis
     behaviorAnalysis: BehaviorAnalysis
+    domSummary: DomSummary
     detectedSignals: list[str]
     reasons: list[str]
     confidence: float = Field(ge=0, le=1)
