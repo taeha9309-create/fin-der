@@ -2,6 +2,7 @@ package com.leveragy.entity;
 
 import javax.persistence.*;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 @Entity
 @Table(name = "url_analysis")
@@ -53,7 +54,7 @@ public class UrlAnalysis {
 
     @PrePersist
     protected void onCreate() {
-        this.createdAt = LocalDateTime.now();
+        this.createdAt = LocalDateTime.now(ZoneId.of("Asia/Seoul"));
         if (this.processingStatus == null) {
             this.processingStatus = "PROCESSING";
         }
