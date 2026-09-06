@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { getAnalysis, submitReport } from "../api/client.js";
+import { riskLevel } from "../riskLevel.js";
 
 const STEPS = ["정보 확인", "제출 중", "완료"];
 
@@ -112,7 +113,7 @@ export default function ReportPage() {
                 <dd className="mono">{analysis.url}</dd>
                 <dt>최종 판정</dt>
                 <dd>
-                  <span className={"verdict-badge tone-" + toneOf(verdict)}>{verdict}</span> {riskScore}/100
+                  <span className={"verdict-badge tone-" + toneOf(verdict)}>{verdict}</span> 위험도 {riskLevel(riskScore)}
                 </dd>
                 <dt>탐지 항목</dt>
                 <dd>{reasons.length ? reasons.join(" · ") : "없음"}</dd>
