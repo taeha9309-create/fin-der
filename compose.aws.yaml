@@ -1,0 +1,9 @@
+services:
+  backend:
+    environment:
+      PAGE_ANALYSIS_BASE_URL: http://multimodal-service:8002
+      URL_ANALYSIS_BASE_URL: http://ml-service:8001
+
+  frontend:
+    ports:
+      - "0.0.0.0:${FRONTEND_PORT:-80}:80"

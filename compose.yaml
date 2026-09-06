@@ -16,7 +16,7 @@ services:
       MYSQL_USER: ${DATABASE_USER:-finder}
       MYSQL_PASSWORD: ${DATABASE_PASSWORD:-change-me}
     ports:
-      - "${DATABASE_HOST_PORT:-3307}:3306"
+      - "127.0.0.1:${DATABASE_HOST_PORT:-3307}:3306"
     volumes:
       - database_data:/var/lib/mysql
       - ./database/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
@@ -46,7 +46,7 @@ services:
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin1234}
     ports:
-      - "${DB_API_PORT:-8081}:8081"
+      - "127.0.0.1:${DB_API_PORT:-8081}:8081"
     healthcheck:
       test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8081/health"]
       interval: 5s
@@ -63,7 +63,7 @@ services:
     environment:
       MODEL_PATH: /app/artifacts/url_xgb.joblib
     ports:
-      - "${ML_SERVICE_PORT:-8001}:8001"
+      - "127.0.0.1:${ML_SERVICE_PORT:-8001}:8001"
     healthcheck:
       test: ["CMD", "python", "-c", "import json,urllib.request; data=json.load(urllib.request.urlopen('http://localhost:8001/health')); assert data['model_loaded']"]
       interval: 5s
@@ -84,7 +84,7 @@ services:
       CLEANUP_INTERVAL_MINUTES: ${CLEANUP_INTERVAL_MINUTES:-60}
       SANDBOX_TEST_ALLOW_HOST: ${SANDBOX_TEST_ALLOW_HOST:-}
     ports:
-      - "${SANDBOX_SERVICE_PORT:-8003}:3001"
+      - "127.0.0.1:${SANDBOX_SERVICE_PORT:-8003}:3001"
     volumes:
       - analysis_data:/data/analyses
     mem_limit: 1g
@@ -112,7 +112,7 @@ services:
       MAX_SCREENSHOT_BYTES: 10485760
       MAX_HTML_BYTES: 2097152
     ports:
-      - "${MULTIMODAL_SERVICE_PORT:-8002}:8002"
+      - "127.0.0.1:${MULTIMODAL_SERVICE_PORT:-8002}:8002"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8002/health')"]
       interval: 5s
@@ -165,7 +165,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     ports:
-      - "${BACKEND_PORT:-8080}:8080"
+      - "127.0.0.1:${BACKEND_PORT:-8080}:8080"
     environment:
       SANDBOX_BASE_URL: http://sandbox:3001
       ML_SERVICE_BASE_URL: http://ml-service:8001
@@ -215,7 +215,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     ports:
-      - "${FRONTEND_PORT:-3000}:80"
+      - "0.0.0.0:${FRONTEND_PORT:-3000}:80"
     depends_on:
       backend:
         condition: service_healthy
