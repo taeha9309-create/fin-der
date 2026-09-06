@@ -14,6 +14,8 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.time.Duration;
 
@@ -22,9 +24,10 @@ import java.time.Duration;
  * 실제 파이프라인(ml-service → 필요시 sandbox → multimodal-service)은 백그라운드에서
  * 계속 실행한 뒤 db-api를 PATCH로 채운다. 프론트는 GET /api/analyze/{id}를 폴링한다.
  *
- * multimodal-service는 GEMINI_API_KEY가 없으면 503을 반환하는데, 이 경우에도
- * 파이프라인 전체가 죽지 않도록 하고 ml-service 판정만으로 finalResult를 정한다.
- * ml/multimodal을 합치는 규칙은 임시(OR 방식)이며, 정식 가중치 로직은 XAI 담당이 정하기로 되어 있다.
+ * 2차(Sandbox+multimodal-service)가 실행되어 결론을 냈다면 그 등급·점수가 최종값이
+ * 된다 - 1차보다 위험하다고 볼 때뿐 아니라 안전하다고 볼 때도 반영된다(resolveFinalResult
+ * 참고). 2차가 생략됐거나(risk_score가 안전 임계치 이하), 호출이 실패했거나, 페이지를
+ * 충분히 수집하지 못해 UNKNOWN이 나온 경우에는 1차(ml-service) 결과를 그대로 쓴다.
  *
  * multimodal-service 응답은 이미 impersonation/domainAnalysis/credentialIntent를
  * 직접 계산해서 내려주므로 backend에서 별도로 브랜드-도메인 매핑을 하지 않고
@@ -128,13 +131,15 @@ public class AnalysisOrchestrator {
                 ? "data:image/png;base64," + combined.sandbox.screenshotBase64()
                 : null;
 
+        FinalResult finalResult = resolveFinalResult(combined);
+
         UpdateAnalysisResultRequest patch = new UpdateAnalysisResultRequest(
-                combined.ml.riskScore(),
+                finalResult.riskScore(),
                 writeJson(combined.ml),
                 writeJson(buildMultimodalResult(combined)),
                 writeJson(combined.ml.xaiReasons()),
                 screenshotData,
-                combineFinalResult(combined),
+                finalResult.label(),
                 "COMPLETED"
         );
 
@@ -158,14 +163,51 @@ public class AnalysisOrchestrator {
                 .timeout(Duration.ofSeconds(10));
     }
 
-    private String combineFinalResult(CombinedResult combined) {
-        if (combined.multimodal == null) {
-            return combined.ml.label();
+    private static final List<String> SEVERITY_ORDER = List.of("NORMAL", "SUSPICIOUS", "PHISHING");
+
+    /**
+     * 2차가 1차보다 위험도를 낮추는(등급을 내리는) 경우, 그 판단을 얼마나 확신하는지
+     * (multimodal의 confidence)가 이 값 미만이면 신뢰하지 않는다 - 예를 들어 PhishTank의
+     * allegro.01201290.beauty처럼 피싱 페이지가 아직 안 올라갔거나 이미 내려가서 빈
+     * 서버 기본 화면만 보이는 경우, 2차는 "지금 화면엔 위험한 게 없다"(confidence 0.55
+     * 수준)고만 말할 뿐인데, 1차가 도메인 자체(브랜드명+숫자+저가 TLD 조합)로 이미 0.999
+     * 확신을 갖고 PHISHING이라 판단한 걸 낮은 확신도의 2차 판단으로 뭉개면 안 된다.
+     * 반대로 2차가 위험도를 올리는(에스컬레이션) 경우는 확신도와 무관하게 항상 반영한다 -
+     * 위험 신호를 놓치는 것보다 과탐지가 안전 도구 입장에서 덜 위험하기 때문이다.
+     */
+    private static final double STAGE2_DOWNGRADE_CONFIDENCE_FLOOR = 0.6;
+
+    private static int severityRank(String label) {
+        int index = SEVERITY_ORDER.indexOf(label == null ? null : label.toUpperCase(Locale.ROOT));
+        return Math.max(index, 0);
+    }
+
+    /**
+     * 2차가 화면·DOM까지 보고 실제로 결론(NORMAL/SUSPICIOUS/PHISHING)을 냈다면, URL
+     * 문자열만 본 1차보다 신뢰도가 높다고 보고 2차의 등급·점수를 그대로 최종값으로 쓴다.
+     * 2차가 안전하다고 판단하면 1차가 이미 PHISHING이었어도 등급이 내려갈 수 있다 -
+     * 예전에는 2차가 PHISHING이라고 할 때만 등급을 올려주는 편도(OR) 로직이었다(BUG-05).
+     * 다만 등급을 내리는 판단은 2차 자신의 confidence가 낮으면 받아들이지 않고 1차를
+     * 그대로 쓴다(STAGE2_DOWNGRADE_CONFIDENCE_FLOOR 참고) - 등급을 올리는 판단은 항상
+     * 반영한다. 2차가 실행되지 않았거나(안전 임계치 이하라 스킵), 실패했거나, 수집
+     * 실패로 UNKNOWN을 낸 경우에는 그 판단을 신뢰할 근거가 없으므로 1차 결과를 그대로 쓴다.
+     */
+    FinalResult resolveFinalResult(CombinedResult combined) {
+        if (combined.multimodal == null || "UNKNOWN".equalsIgnoreCase(combined.multimodal.verdict())) {
+            return new FinalResult(combined.ml.label(), combined.ml.riskScore());
         }
 
-        boolean multimodalHighRisk = "PHISHING".equalsIgnoreCase(combined.multimodal.verdict());
+        boolean isDowngrade = severityRank(combined.multimodal.verdict()) < severityRank(combined.ml.label());
+        Double confidence = combined.multimodal.confidence();
+        boolean downgradeConfidenceTooLow = confidence == null || confidence < STAGE2_DOWNGRADE_CONFIDENCE_FLOOR;
+        if (isDowngrade && downgradeConfidenceTooLow) {
+            return new FinalResult(combined.ml.label(), combined.ml.riskScore());
+        }
 
-        return multimodalHighRisk ? "PHISHING" : combined.ml.label();
+        return new FinalResult(combined.multimodal.verdict(), combined.multimodal.pageRiskScore());
+    }
+
+    record FinalResult(String label, Integer riskScore) {
     }
 
     /**
@@ -197,7 +239,7 @@ public class AnalysisOrchestrator {
         }
     }
 
-    private record CombinedResult(
+    record CombinedResult(
             MlServiceResponse ml,
             SandboxResponse sandbox,
             String sandboxError,
