@@ -58,6 +58,8 @@ class UrlRiskModel:
         values = extract_features(url)
         matrix = np.asarray([[values[name] for name in FEATURE_NAMES]], dtype=float)
         probability = float(self.model.predict_proba(matrix)[0, 1])
+        if values["official_financial_domain"] == 1.0:
+            probability = min(probability, 0.05)
         reasons = self._explain(matrix)
         label = "PHISHING" if probability >= 0.70 else "SUSPICIOUS" if probability >= 0.40 else "NORMAL"
         return Prediction(probability, label, reasons, values, self.version)

@@ -10,6 +10,7 @@ from urllib.parse import urlsplit
 
 BRANDS_PATH = Path(__file__).resolve().parents[1] / "data" / "financial_brands.csv"
 KOREAN_PUBLIC_SUFFIXES = {"co.kr", "or.kr", "go.kr", "ac.kr", "ne.kr", "re.kr"}
+EXTRA_OFFICIAL_DOMAIN_ALIASES = {"nonghyup.com": "nhbank.com"}
 
 
 @lru_cache(maxsize=1)
@@ -45,10 +46,27 @@ def analyze_financial_domain(raw_url: str) -> dict[str, object]:
             if keyword in searchable and len(keyword) > len(best_keyword):
                 best, best_keyword = brand, keyword
 
-    official_domains = {str(item["official_domain"]).lower() for item in load_brands()}
+    official_domains = {
+        candidate.strip().lower()
+        for item in load_brands()
+        for candidate in str(item["official_domain"]).split("|")
+        if candidate.strip()
+    }
+    official_domains.update(EXTRA_OFFICIAL_DOMAIN_ALIASES.keys())
     official_match = domain in official_domains
-    expected_domain = str(best["official_domain"]).lower() if best else ""
-    similarity = SequenceMatcher(None, domain, expected_domain).ratio() if expected_domain else 0.0
+    expected_domains = [
+        candidate.strip().lower()
+        for candidate in str(best["official_domain"]).split("|")
+        if candidate.strip()
+    ] if best else []
+    expected_domains.extend(
+        alias for alias, canonical in EXTRA_OFFICIAL_DOMAIN_ALIASES.items() if canonical in expected_domains
+    )
+    expected_domain = expected_domains[0] if expected_domains else ""
+    similarity = max(
+        (SequenceMatcher(None, domain, candidate).ratio() for candidate in expected_domains),
+        default=0.0,
+    )
     return {
         "registered_domain": domain,
         "matched_brand": str(best["brand"]) if best else "",
@@ -56,5 +74,5 @@ def analyze_financial_domain(raw_url: str) -> dict[str, object]:
         "expected_official_domain": expected_domain,
         "official_domain_match": official_match,
         "brand_domain_similarity": similarity,
-        "brand_domain_mismatch": bool(best and domain != expected_domain),
+        "brand_domain_mismatch": bool(best and domain not in expected_domains),
     }
