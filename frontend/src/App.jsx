@@ -20,7 +20,7 @@ export default function App() {
         </Link>
         <nav className="app-nav">
           <Link to="/history">분석 이력</Link>
-          <Link to="/threat-intel">Threat Intelligence</Link>
+          <Link to="/threat-intel">피싱 확정</Link>
           <Link to="/admin">관리자</Link>
         </nav>
       </header>

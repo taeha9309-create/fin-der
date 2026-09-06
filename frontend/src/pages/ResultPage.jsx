@@ -233,26 +233,15 @@ export default function ResultPage() {
         </div>
 
         <div className="panel-card">
-          <h4>주요 위험 요약</h4>
-          {riskSummary.length ? (
-            <div className="risk-list">
-              {riskSummary.map((item) => (
-                <div key={item.title} className="risk-item">
-                  <div className="ri-main">
-                    <RiskIcon type={item.icon} />
-                    <div className="ri-text">
-                      <b>{item.title}</b>
-                      <small>{item.desc}</small>
-                    </div>
-                  </div>
-                  <span className={"sev sev-" + item.severity}>{item.severity === "danger" ? "위험" : "주의"}</span>
-                </div>
+          <h4>AI 분석 근거 (요약)</h4>
+          {reasons.length ? (
+            <ol className="ai-reasons">
+              {reasons.map((reason, idx) => (
+                <li key={idx}>{reason}</li>
               ))}
-            </div>
+            </ol>
           ) : (
-            <p className="body-muted">
-              {pageAnalysis ? "감지된 위험 신호가 없습니다." : collectionStatusMessage}
-            </p>
+            <p className="body-muted">표시할 판단 근거가 없습니다.</p>
           )}
         </div>
       </div>
@@ -334,15 +323,26 @@ export default function ResultPage() {
         </div>
 
         <div className="panel-card">
-          <h4>AI 분석 근거 (요약)</h4>
-          {reasons.length ? (
-            <ol className="ai-reasons">
-              {reasons.map((reason, idx) => (
-                <li key={idx}>{reason}</li>
+          <h4>주요 위험 요약</h4>
+          {riskSummary.length ? (
+            <div className="risk-list">
+              {riskSummary.map((item) => (
+                <div key={item.title} className="risk-item">
+                  <div className="ri-main">
+                    <RiskIcon type={item.icon} />
+                    <div className="ri-text">
+                      <b>{item.title}</b>
+                      <small>{item.desc}</small>
+                    </div>
+                  </div>
+                  <span className={"sev sev-" + item.severity}>{item.severity === "danger" ? "위험" : "주의"}</span>
+                </div>
               ))}
-            </ol>
+            </div>
           ) : (
-            <p className="body-muted">표시할 판단 근거가 없습니다.</p>
+            <p className="body-muted">
+              {pageAnalysis ? "감지된 위험 신호가 없습니다." : collectionStatusMessage}
+            </p>
           )}
         </div>
       </div>
@@ -384,6 +384,16 @@ function RiskIcon({ type }) {
       </>
     ),
     link: <path d="M14 4h6v6M20 4 10 14M9 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-3" />,
+    alert: <path d="M12 9v4m0 4h.01M10.3 3.86 1.8 18a1.5 1.5 0 0 0 1.3 2.25h17.8a1.5 1.5 0 0 0 1.3-2.25L13.7 3.86a1.5 1.5 0 0 0-2.6 0Z" />,
+    shield: <path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3Z" />,
+    money: <path d="M12 6v12M9 9.5c0-1.5 1.3-2.5 3-2.5s3 1 3 2.5-1.3 2-3 2-3 1-3 2.5 1.3 2.5 3 2.5 3-1 3-2.5" />,
+    download: (
+      <>
+        <path d="M12 3v12" />
+        <path d="m7 10 5 5 5-5" />
+        <path d="M5 21h14" />
+      </>
+    ),
   };
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -397,7 +407,16 @@ function buildRiskSummary(pageAnalysis) {
   const items = [];
   const brand = pageAnalysis.impersonation?.brand;
   const credentialTypes = pageAnalysis.credentialIntent?.types || [];
+  const signals = pageAnalysis.detectedSignals || [];
 
+  if (signals.includes("SECURITY_VENDOR_BLOCKED")) {
+    items.push({
+      icon: "shield",
+      title: "보안 업체 차단 이력",
+      desc: "Cloudflare·Google Safe Browsing 등 보안 업체가 이미 피싱으로 차단한 사이트입니다.",
+      severity: "danger",
+    });
+  }
   if (pageAnalysis.domainAnalysis?.domainBrandMismatch) {
     items.push({
       icon: "domain",
@@ -412,11 +431,44 @@ function buildRiskSummary(pageAnalysis) {
   if (credentialTypes.includes("OTP")) {
     items.push({ icon: "lock", title: "OTP 입력 요구", desc: "일회용 인증번호 입력 필드 발견", severity: "danger" });
   }
-  if (pageAnalysis.detectedSignals?.includes("POST_FORM")) {
+  if (credentialTypes.includes("RESIDENT_NUMBER")) {
+    items.push({ icon: "lock", title: "주민등록번호 입력 요구", desc: "주민등록번호 입력 필드 발견", severity: "danger" });
+  }
+  if (credentialTypes.includes("ACCOUNT_NUMBER")) {
+    items.push({ icon: "lock", title: "계좌번호 입력 요구", desc: "계좌번호 입력 필드 발견", severity: "danger" });
+  }
+  if (credentialTypes.includes("CARD_NUMBER")) {
+    items.push({ icon: "lock", title: "카드번호 입력 요구", desc: "카드번호 입력 필드 발견", severity: "danger" });
+  }
+  if (credentialTypes.includes("PIN")) {
+    items.push({ icon: "lock", title: "PIN 입력 요구", desc: "PIN 번호 입력 필드 발견", severity: "danger" });
+  }
+  if (credentialTypes.includes("PHONE")) {
+    items.push({ icon: "lock", title: "휴대폰번호 입력 요구", desc: "휴대폰번호 입력 필드 발견", severity: "warning" });
+  }
+  if (signals.includes("POST_FORM")) {
     items.push({ icon: "form", title: "정보 전송 가능 Form", desc: "POST 방식으로 정보 전송 가능", severity: "danger" });
   }
-  if (pageAnalysis.detectedSignals?.includes("EXTERNAL_CONTACT")) {
+  if (signals.includes("EXTERNAL_FORM_ACTION")) {
+    items.push({ icon: "form", title: "입력정보 외부 전송", desc: "입력한 정보가 현재 사이트와 다른 외부 도메인으로 전송될 수 있습니다.", severity: "danger" });
+  }
+  if (signals.includes("EXTERNAL_CONTACT")) {
     items.push({ icon: "link", title: "외부 링크·상담 유도", desc: "외부 상담 채널로 연결되는 링크 발견", severity: "warning" });
+  }
+  if (signals.includes("DOWNLOAD_REQUEST")) {
+    items.push({ icon: "download", title: "파일 다운로드 유도", desc: "프로그램 또는 파일 다운로드를 유도하는 정황이 확인되었습니다.", severity: "warning" });
+  }
+  if (signals.includes("ACCOUNT_SUSPENSION_MESSAGE")) {
+    items.push({ icon: "alert", title: "계정 정지 경고 문구", desc: "계정 또는 계좌 이용 제한을 경고하는 문구가 확인되었습니다.", severity: "danger" });
+  }
+  if (signals.includes("URGENCY_MESSAGE")) {
+    items.push({ icon: "alert", title: "긴급성 유도 문구", desc: "즉시 행동을 요구하는 긴급성 문구가 확인되었습니다.", severity: "warning" });
+  }
+  if (signals.includes("BENEFIT_LURE")) {
+    items.push({ icon: "money", title: "금전적 혜택 유도", desc: "지원금·환급금·대출 등 금전적 혜택을 강조하는 문구가 확인되었습니다.", severity: "warning" });
+  }
+  if (signals.includes("FINANCIAL_ACTION_REQUEST")) {
+    items.push({ icon: "money", title: "금융 행동 요구", desc: "송금·이체·계좌정보 입력 등 금융 행동을 요구합니다.", severity: "danger" });
   }
   return items;
 }
