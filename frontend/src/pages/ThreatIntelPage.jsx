@@ -10,7 +10,7 @@ export default function ThreatIntelPage() {
     setError("");
     listReports("CONFIRMED_PHISHING")
       .then(setReports)
-      .catch(() => setError("Threat Intelligence 목록을 불러오지 못했습니다."));
+      .catch(() => setError("피싱 확정 목록을 불러오지 못했습니다."));
   }, []);
 
   useEffect(() => {
@@ -38,7 +38,7 @@ export default function ThreatIntelPage() {
 
   return (
     <div className="page">
-      <h1 className="page-title">Threat Intelligence</h1>
+      <h1 className="page-title">피싱 확정</h1>
       <p className="subtitle">관리자가 피싱으로 확정한 URL 목록입니다. 아래 URL은 절대 접속하지 마세요.</p>
 
       {reports.length === 0 ? (
