@@ -13,6 +13,7 @@ except ImportError:
 
 
 SIGNAL_ORDER = (
+    "SECURITY_VENDOR_BLOCKED",
     "PASSWORD_FIELD", "OTP_FIELD", "PHONE_FIELD", "RESIDENT_NUMBER_FIELD",
     "ACCOUNT_FIELD", "CARD_FIELD", "PIN_FIELD", "EMAIL_FIELD", "USER_ID_FIELD",
     "POST_FORM", "EXTERNAL_FORM_ACTION", "BRAND_IMPERSONATION",
@@ -37,10 +38,22 @@ CREDENTIAL_PATTERNS = {
     "USER_ID": ("아이디", "userid", "username", "loginid"),
 }
 TEXT_SIGNALS = {
-    "URGENCY_MESSAGE": ("즉시", "긴급", "지금바로", "오늘까지", "오늘마감", "30분이내", "제한시간", "기한내"),
-    "ACCOUNT_SUSPENSION_MESSAGE": ("계좌정지", "계좌가정지", "계정정지", "계정이정지", "거래제한", "이용제한", "계좌가잠깁니다", "인증하지않으면정지"),
+    # Each pattern must be specific enough that it doesn't appear inside ordinary
+    # e-commerce/legal boilerplate once whitespace is stripped for matching, e.g.
+    # "즉시"/"이용제한" show up on almost any Korean site's "적립금 즉시 사용" or
+    # standard terms-of-service text, and "입금"/"이체"/"송금" are substrings of
+    # completely benign phrases like "무통장입금" (a normal payment method) or
+    # "배송금액" (shipping cost) -- see BUG-06.
+    "URGENCY_MESSAGE": ("지금바로", "오늘까지", "오늘마감", "30분이내", "제한시간", "기한내"),
+    "ACCOUNT_SUSPENSION_MESSAGE": ("계좌정지", "계좌가정지", "계정정지", "계정이정지", "계좌가잠깁니다", "인증하지않으면정지"),
     "BENEFIT_LURE": ("지원금", "환급금", "보상금", "대출승인", "저금리", "특별지원", "정부지원금"),
-    "FINANCIAL_ACTION_REQUEST": ("송금", "이체", "입금", "계좌번호입력", "카드정보입력", "대출신청", "수수료납부"),
+    "FINANCIAL_ACTION_REQUEST": ("계좌번호입력", "카드정보입력", "대출신청", "수수료납부"),
+    # A security vendor's own interstitial (Cloudflare's "Suspected Phishing" block
+    # page, Google Safe Browsing's "Deceptive site ahead", etc.) means the domain
+    # has already been independently confirmed malicious, even though the page
+    # currently on screen is the vendor's harmless-looking warning, not the
+    # original phishing content -- see BUG-07.
+    "SECURITY_VENDOR_BLOCKED": ("suspected phishing", "deceptive site ahead"),
 }
 CONTACT_PATTERNS = ("kakao", "카카오톡", "telegram", "텔레그램", "open.kakao.com", "t.me", "whatsapp", "line", "상담", "문의")
 DOWNLOAD_SUFFIXES = {".apk", ".exe", ".msi", ".dmg", ".pkg", ".zip"}
@@ -148,7 +161,13 @@ def analyze_dom_risk(input_data: dict) -> dict:
     text_parts = [input_data.get("title", ""), input_data.get("page_text", ""), input_data.get("html", ""), *buttons]
     text_parts.extend(link.get("text", "") for link in links)
     full_text = " ".join(str(part or "") for part in text_parts)
-    normalized_text = _normalized(full_text)
+
+    # TEXT_SIGNALS look for social-engineering phrasing a user would actually
+    # read, so raw HTML markup (tag/class/script/comment text) is excluded --
+    # otherwise unrelated source code can spuriously contain a keyword. See BUG-06.
+    visible_text_parts = [input_data.get("title", ""), input_data.get("page_text", ""), *buttons]
+    visible_text_parts.extend(link.get("text", "") for link in links)
+    normalized_text = _normalized(" ".join(str(part or "") for part in visible_text_parts))
 
     candidates = find_brand_candidates(text_parts)
     candidates.sort(key=lambda item: (

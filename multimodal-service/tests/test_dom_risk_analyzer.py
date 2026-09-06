@@ -133,6 +133,51 @@ def test_synthetic_bank_impersonation_still_has_mismatch():
     assert {"BRAND_IMPERSONATION", "BRAND_DOMAIN_MISMATCH"} <= set(result["detectedSignals"])
 
 
+def test_benign_ecommerce_boilerplate_does_not_trigger_text_signals():
+    # Regression for BUG-06: generic UI/legal copy ("즉시 사용", "이용제한",
+    # "무통장입금") used to trip URGENCY_MESSAGE / ACCOUNT_SUSPENSION_MESSAGE /
+    # FINANCIAL_ACTION_REQUEST on virtually any ordinary Korean shopping page.
+    result = analyze_dom_risk({
+        "final_url": "https://example-shop.co.kr/product/123",
+        "title": "겨울 니트 원피스 - 무료배송",
+        "page_text": (
+            "겨울 신상 니트 원피스 할인 이벤트. 5만원 이상 구매 시 무료배송, 무통장입금 시 당일 발송. "
+            "적립금 즉시 사용 가능. 교환/환불은 이용약관에 따라 이용제한될 수 있습니다."
+        ),
+        "inputs": [], "forms": [], "links": [], "dom_signals": {},
+    })
+    assert not {"URGENCY_MESSAGE", "ACCOUNT_SUSPENSION_MESSAGE", "FINANCIAL_ACTION_REQUEST"} & set(result["detectedSignals"])
+
+
+def test_text_signals_ignore_raw_html_markup_noise():
+    # Regression for BUG-06: TEXT_SIGNALS must only scan user-visible text
+    # (title/page_text/buttons/links), not the raw HTML source, since markup,
+    # class names, and boilerplate footers can contain a keyword by accident.
+    result = analyze_dom_risk({
+        "final_url": "https://example.com/",
+        "title": "일반 페이지",
+        "page_text": "평범한 내용입니다.",
+        "html": "<footer class='account-suspension-notice'>부정 이용 시 계좌가 정지됩니다.</footer>",
+        "inputs": [], "forms": [], "links": [], "dom_signals": {},
+    })
+    assert "ACCOUNT_SUSPENSION_MESSAGE" not in result["detectedSignals"]
+
+
+def test_security_vendor_block_page_is_detected_from_title():
+    # Regression for BUG-07: a Cloudflare "Suspected Phishing" (or Google Safe
+    # Browsing "Deceptive site ahead") interstitial means a third party has
+    # already confirmed the domain is malicious, even though the interstitial
+    # itself has no password fields or brand mismatch to key off of.
+    result = analyze_dom_risk({
+        "final_url": "https://bancaribe.pages.dev/",
+        "title": "Suspected Phishing | Cloudflare",
+        "page_text": "",
+        "inputs": [], "forms": [{"method": "GET", "action": "https://bancaribe.pages.dev/cdn-cgi/phish-bypass"}],
+        "links": [], "dom_signals": {},
+    })
+    assert "SECURITY_VENDOR_BLOCKED" in result["detectedSignals"]
+
+
 def test_government_mention_and_synthetic_impersonation_are_separated():
     mention = analyze_dom_risk({"final_url": "https://news.example.com/tax",
         "page_text": "국세청이 새로운 세금 신고 일정을 발표했습니다.",

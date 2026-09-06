@@ -42,6 +42,12 @@ NORMAL_MAX = 29
 SUSPICIOUS_MAX = 59
 SEMANTIC_ADJUSTMENTS = {"LOW": -8, "MEDIUM": 0, "HIGH": 8}
 OFFICIAL_SAFE_CAP = 20
+# A security vendor's own block/warning interstitial (Cloudflare's "Suspected
+# Phishing" page, Google Safe Browsing's "Deceptive site ahead", etc.) means a
+# third party has already independently confirmed the domain is malicious --
+# that outranks every other heuristic here, including the official-domain
+# safe cap, even though the interstitial itself looks harmless. See BUG-07.
+SECURITY_VENDOR_BLOCK_FLOOR = 90
 UNKNOWN_REASON = "페이지 정보를 충분히 수집하지 못해 위험 여부를 판단할 수 없습니다."
 
 AUTH_SIGNALS = {"PASSWORD_FIELD", "OTP_FIELD"}
@@ -107,6 +113,8 @@ def _is_official_safe_context(rule: dict[str, Any], signals: set[str]) -> bool:
 def _reasons(rule: dict[str, Any], signals: set[str], semantic: dict[str, Any] | None) -> list[str]:
     brand = rule.get("impersonation", {}).get("brand") or "탐지된 기관"
     reasons: list[str] = []
+    if "SECURITY_VENDOR_BLOCKED" in signals:
+        reasons.append("보안 업체(Cloudflare, Google Safe Browsing 등)가 이 도메인을 이미 피싱 사이트로 신고·차단한 상태입니다.")
     if "BRAND_DOMAIN_MISMATCH" in signals:
         reasons.append(f"{brand}의 공식 도메인과 현재 접속 도메인이 일치하지 않습니다.")
     if {"PASSWORD_FIELD", "OTP_FIELD"} <= signals:
@@ -191,6 +199,8 @@ def fuse_analysis(rule_analysis: dict[str, Any], gemini_analysis: dict[str, Any]
     score = _score(signals) + _semantic_adjustment(gemini_analysis)
     if _is_official_safe_context(rule_analysis, signals):
         score = min(score, OFFICIAL_SAFE_CAP)
+    if "SECURITY_VENDOR_BLOCKED" in signals:
+        score = max(score, SECURITY_VENDOR_BLOCK_FLOOR)
     score = max(0, min(100, score))
     verdict = "NORMAL" if score <= NORMAL_MAX else "SUSPICIOUS" if score <= SUSPICIOUS_MAX else "PHISHING"
     candidate = rule_analysis.get("impersonation") or {}
