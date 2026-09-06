@@ -93,7 +93,7 @@ export default function ResultPage() {
 
   const riskScore = analysis.riskScore ?? 0;
 
-  if (riskScore <= 10) {
+  if (riskScore <= 20) {
     return (
       <div className="page result-page">
         <div className="safe-result">
