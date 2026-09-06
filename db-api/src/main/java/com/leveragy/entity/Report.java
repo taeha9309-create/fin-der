@@ -2,6 +2,7 @@ package com.leveragy.entity;
 
 import javax.persistence.*;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 @Entity
 @Table(name = "reports")
@@ -39,7 +40,7 @@ public class Report {
 
     @PrePersist
     protected void onCreate() {
-        this.createdAt = LocalDateTime.now();
+        this.createdAt = LocalDateTime.now(ZoneId.of("Asia/Seoul"));
         if (this.status == null) {
             this.status = "PENDING";
         }
