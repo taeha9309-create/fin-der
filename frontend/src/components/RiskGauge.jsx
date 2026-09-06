@@ -1,12 +1,9 @@
-import { riskLevel } from "../riskLevel.js";
-
 export default function RiskGauge({ score, tone = "danger", size = 64 }) {
   const strokeWidth = 6;
   const r = (size - strokeWidth) / 2;
   const c = 2 * Math.PI * r;
   const clamped = Math.max(0, Math.min(100, Math.round(score)));
   const offset = c * (1 - clamped / 100);
-  const level = riskLevel(clamped);
 
   return (
     <div className="risk-gauge">
@@ -31,8 +28,11 @@ export default function RiskGauge({ score, tone = "danger", size = 64 }) {
           strokeDashoffset={offset}
           transform={`rotate(-90 ${size / 2} ${size / 2})`}
         />
-        <text x="50%" y="55%" textAnchor="middle" className="gauge-score">
-          {level}
+        <text x="50%" y="46%" textAnchor="middle" className="gauge-score">
+          {clamped}
+        </text>
+        <text x="50%" y="66%" textAnchor="middle" className="gauge-unit">
+          /100
         </text>
       </svg>
       <div className="risk-score-label">위험도</div>

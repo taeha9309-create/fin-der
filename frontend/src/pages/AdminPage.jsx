@@ -10,7 +10,6 @@ import {
   clearAdminToken,
 } from "../api/client.js";
 import ErrorState from "../components/ErrorState.jsx";
-import { riskLevel } from "../riskLevel.js";
 
 const VERDICT_TONE = { PHISHING: "danger", SUSPICIOUS: "warning", NORMAL: "safe" };
 
@@ -237,7 +236,7 @@ function AdminDashboard({ onSessionExpired }) {
                 <span className={"verdict-badge tone-" + (VERDICT_TONE[analysesById[report.analysisId].finalResult] || "safe")}>
                   {analysesById[report.analysisId].finalResult}
                 </span>
-                <span className="history-score">위험도 {riskLevel(analysesById[report.analysisId].riskScore)}</span>
+                <span className="history-score">{analysesById[report.analysisId].riskScore}/100</span>
                 <Link to={`/result/${report.analysisId}`} target="_blank" rel="noopener noreferrer" className="link-btn">
                   분석 상세 보기 ↗
                 </Link>

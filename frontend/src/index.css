@@ -141,6 +141,7 @@ body {
   font-weight: 600;
   font-size: 13.5px;
   cursor: pointer;
+  text-decoration: none;
   transition: filter 0.15s ease;
 }
 
@@ -176,6 +177,10 @@ body {
 .btn-small {
   font-size: 12px;
   padding: 8px 10px;
+}
+
+.btn-icon {
+  margin-right: 6px;
 }
 
 .error-text {
@@ -486,6 +491,15 @@ body {
 
 .safe-result .action-row {
   margin-top: 18px;
+}
+
+.safe-result .action-row .btn {
+  flex: none;
+  white-space: nowrap;
+}
+
+.safe-result .action-row .btn-ghost {
+  background: var(--surface);
 }
 
 .risk-banner-title {
