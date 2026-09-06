@@ -4,9 +4,9 @@ import { analyzeUrl } from "../api/client.js";
 import LoadingOverlay from "../components/LoadingOverlay.jsx";
 
 const EXAMPLE_URLS = [
-  "https://example.com/kb-login-security/verify?otp=1004",
-  "https://example.com/verify",
-  "https://gov-login.com",
+  "https://minn778.github.io/phishing-site/phishing-demo-safe-fixture.html",
+  "https://toss.im/career/job-detail?job_id=7665307003",
+  "https://www.kbstar.com/",
 ];
 
 export default function UrlInputPage() {
