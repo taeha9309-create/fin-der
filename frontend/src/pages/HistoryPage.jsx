@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { listAnalyses } from "../api/client.js";
 import ErrorState from "../components/ErrorState.jsx";
-import { riskLevel } from "../riskLevel.js";
 
 export default function HistoryPage() {
   const [analyses, setAnalyses] = useState(null);
@@ -72,7 +71,7 @@ export default function HistoryPage() {
                   ) : (
                     <>
                       <span className={"verdict-badge tone-" + toneOf(item.finalResult)}>{item.finalResult}</span>
-                      <span className="history-score">위험도 {riskLevel(item.riskScore)}</span>
+                      <span className="history-score">{item.riskScore}/100</span>
                     </>
                   )}
                 </div>

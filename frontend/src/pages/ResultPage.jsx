@@ -92,6 +92,9 @@ export default function ResultPage() {
   }
 
   const riskScore = analysis.riskScore ?? 0;
+  const pageAnalysis = safeParsePageAnalysis(analysis.multimodalResult);
+  const collectionSummary = safeParseCollectionSummary(analysis.multimodalResult);
+  const blockedNotice = buildBlockedNotice(pageAnalysis, collectionSummary);
 
   if (riskScore <= 20) {
     return (
@@ -108,12 +111,22 @@ export default function ResultPage() {
             <span>분석 시간 {formatDate(analysis.createdAt)}</span>
             <span>분석 ID {analysis.id}</span>
           </div>
+          {blockedNotice && (
+            <div className="risk-banner tone-danger">
+              <div className="risk-banner-left">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M12 9v4m0 4h.01M10.3 3.86 1.8 18a1.5 1.5 0 0 0 1.3 2.25h17.8a1.5 1.5 0 0 0 1.3-2.25L13.7 3.86a1.5 1.5 0 0 0-2.6 0Z" />
+                </svg>
+                <div className="risk-banner-title">{blockedNotice}</div>
+              </div>
+            </div>
+          )}
           <div className="action-row">
-            <button className="btn btn-ghost btn-small" onClick={handleShare}>
-              {shared ? "링크 복사됨" : "결과 공유"}
-            </button>
+            <a className="btn btn-ghost" href={analysis.url} target="_blank" rel="noopener noreferrer">
+              사이트로 이동하기
+            </a>
             <Link to={`/report/${analysis.id}`} className="btn btn-danger">
-              🚩 이 사이트 제보하기
+              <span className="btn-icon" aria-hidden="true">🚩</span>이 사이트 제보하기
             </Link>
           </div>
         </div>
@@ -122,8 +135,6 @@ export default function ResultPage() {
   }
 
   const xaiReasons = safeParseReasons(analysis.xaiResult);
-  const pageAnalysis = safeParsePageAnalysis(analysis.multimodalResult);
-  const collectionSummary = safeParseCollectionSummary(analysis.multimodalResult);
   const collectionStatusMessage = buildCollectionStatusMessage(collectionSummary);
   const verdict = analysis.finalResult || "NORMAL";
   const meta = VERDICT_META[verdict] || VERDICT_META.NORMAL;
@@ -135,12 +146,16 @@ export default function ResultPage() {
       <div className="result-header">
         <div>
           <div className="field-label">분석한 URL</div>
-          <a className="analyzed-url mono" href={analysis.url} target="_blank" rel="noopener noreferrer">
-            {analysis.url}
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M14 4h6v6M20 4 10 14M9 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-3" />
-            </svg>
-          </a>
+          {verdict === "PHISHING" ? (
+            <span className="analyzed-url mono">{analysis.url}</span>
+          ) : (
+            <a className="analyzed-url mono" href={analysis.url} target="_blank" rel="noopener noreferrer">
+              {analysis.url}
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M14 4h6v6M20 4 10 14M9 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-3" />
+              </svg>
+            </a>
+          )}
           <div className="meta-row mono">
             <span>분석 시간 {formatDate(analysis.createdAt)}</span>
             <span>분석 ID {analysis.id}</span>
@@ -169,6 +184,17 @@ export default function ResultPage() {
         </div>
         <RiskGauge score={riskScore} tone={meta.tone} />
       </div>
+
+      {blockedNotice && (
+        <div className="risk-banner tone-danger">
+          <div className="risk-banner-left">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M12 9v4m0 4h.01M10.3 3.86 1.8 18a1.5 1.5 0 0 0 1.3 2.25h17.8a1.5 1.5 0 0 0 1.3-2.25L13.7 3.86a1.5 1.5 0 0 0-2.6 0Z" />
+            </svg>
+            <div className="risk-banner-title">{blockedNotice}</div>
+          </div>
+        </div>
+      )}
 
       <div className="cols2">
         <div className="panel-card">
@@ -435,6 +461,18 @@ function buildCollectionStatusMessage(summary) {
       : "Sandbox가 페이지를 수집하지 못했습니다. URL AI 결과만 표시합니다.";
   }
   return "Sandbox 페이지 수집은 완료됐지만 표시할 정밀 분석 결과가 없습니다.";
+}
+
+// 점수·등급 계산과 무관하게, "이미 차단/접속 불가"라는 사실 자체를 알려준다 -
+// 위험도가 낮게 나온 경우에도 이 배너는 그와 별개로 뜬다.
+function buildBlockedNotice(pageAnalysis, collectionSummary) {
+  if (pageAnalysis?.detectedSignals?.includes("SECURITY_VENDOR_BLOCKED")) {
+    return "보안 업체(Cloudflare, Google Safe Browsing 등)가 이미 이 사이트를 피싱으로 신고·차단한 상태입니다.";
+  }
+  if (collectionSummary?.collected === false && collectionSummary.note !== "not_required") {
+    return "현재 이 사이트에 정상적으로 접속할 수 없습니다. 이미 차단되었거나 서비스가 중단된 피싱 사이트일 수 있습니다.";
+  }
+  return null;
 }
 
 function formatDate(iso) {
