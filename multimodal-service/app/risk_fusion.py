@@ -182,6 +182,7 @@ def fuse_analysis(rule_analysis: dict[str, Any], gemini_analysis: dict[str, Any]
             "credentialIntent": {"detected": False, "types": []},
             "domainAnalysis": {"currentDomain": None, "officialDomains": [], "domainBrandMismatch": False},
             "behaviorAnalysis": {"financialActionRequest": False, "externalContactRequest": False, "downloadRequest": False},
+            "domSummary": rule_analysis.get("domSummary") or {},
             "detectedSignals": [], "reasons": [UNKNOWN_REASON], "confidence": 0.0,
         }
 
@@ -205,6 +206,7 @@ def fuse_analysis(rule_analysis: dict[str, Any], gemini_analysis: dict[str, Any]
         "credentialIntent": rule_analysis.get("credentialIntent") or {"detected": False, "types": []},
         "domainAnalysis": {key: (rule_analysis.get("domainAnalysis") or {}).get(key) for key in ("currentDomain", "officialDomains", "domainBrandMismatch")},
         "behaviorAnalysis": rule_analysis.get("behaviorAnalysis") or {},
+        "domSummary": rule_analysis.get("domSummary") or {},
         "detectedSignals": ordered_signals,
         "reasons": _reasons(rule_analysis, signals, gemini_analysis),
         "confidence": _confidence(signals, rule_analysis, gemini_analysis, collection_status),
