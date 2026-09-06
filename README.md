@@ -56,6 +56,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test.ps1
 Backend와 Sandbox의 요청·응답 규격은
 [Backend / Sandbox API](docs/backend-sandbox-api.md)에서 확인할 수 있습니다.
 
+AWS EC2 배포는 [AWS EC2 배포 안내](deploy/aws/README.md)를 참고하십시오. 운영 배포에서는 `.env.aws.example`을 `.env`로 복사하고 `compose.aws.yaml`을 함께 사용합니다.
+
 ## Backend/Sandbox smoke test
 
 Docker 서비스가 실행 중인 상태에서 프로젝트 루트의 PowerShell에서 실행합니다.

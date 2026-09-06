@@ -2,17 +2,32 @@
 $OutputEncoding = [System.Text.UTF8Encoding]::new()
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$backendPort = if ($env:BACKEND_PORT) { $env:BACKEND_PORT } else { "8080" }
-$dbApiPort = if ($env:DB_API_PORT) { $env:DB_API_PORT } else { "8081" }
-$frontendPort = if ($env:FRONTEND_PORT) { $env:FRONTEND_PORT } else { "3000" }
-$multimodalPort = if ($env:MULTIMODAL_SERVICE_PORT) { $env:MULTIMODAL_SERVICE_PORT } else { "8002" }
-$sandboxPort = if ($env:SANDBOX_SERVICE_PORT) { $env:SANDBOX_SERVICE_PORT } else { "8003" }
 
-$backendBaseUrl = "http://localhost:$backendPort"
+function Get-ComposePublishedPort {
+    param(
+        [string]$Service,
+        [int]$ContainerPort,
+        [string]$FallbackPort
+    )
+
+    $binding = docker compose --project-directory $repoRoot port $Service $ContainerPort 2>$null | Select-Object -First 1
+    if ($LASTEXITCODE -eq 0 -and $binding -match ':(\d+)$') {
+        return $Matches[1]
+    }
+    return $FallbackPort
+}
+
+$backendPort = Get-ComposePublishedPort "backend" 8080 "8080"
+$dbApiPort = Get-ComposePublishedPort "db-api" 8081 "8081"
+$frontendPort = Get-ComposePublishedPort "frontend" 80 "3000"
+$multimodalPort = Get-ComposePublishedPort "multimodal-service" 8002 "8002"
+$sandboxPort = Get-ComposePublishedPort "sandbox" 3001 "8003"
+
+$backendBaseUrl = "http://127.0.0.1:$backendPort"
 $syncApiUrl = "$backendBaseUrl/api/v1/url-analysis"
 $asyncApiUrl = "$backendBaseUrl/api/analyze"
-$dbApiUrl = "http://localhost:$dbApiPort/api"
-$sandboxApiUrl = "http://localhost:$sandboxPort/analyze"
+$dbApiUrl = "http://127.0.0.1:$dbApiPort/api"
+$sandboxApiUrl = "http://127.0.0.1:$sandboxPort/analyze"
 $pollTimeoutSeconds = 75
 $requiredServices = @(
     "database", "db-api", "ml-service", "sandbox", "multimodal-service",
@@ -37,7 +52,7 @@ function Convert-ErrorBody {
 }
 
 function Wait-BackendReady {
-    param([int]$TimeoutSeconds = 60)
+    param([int]$TimeoutSeconds = 120)
     $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
     do {
         try {
@@ -47,7 +62,11 @@ function Wait-BackendReady {
         }
         Start-Sleep -Milliseconds 500
     } while ((Get-Date) -lt $deadline)
-    throw "Backend가 ${TimeoutSeconds}초 안에 HTTP 요청 준비를 완료하지 못했습니다."
+    Write-Host "Backend 준비 실패 시점의 컨테이너 상태:" -ForegroundColor Yellow
+    docker compose ps -a
+    Write-Host "최근 Backend 로그:" -ForegroundColor Yellow
+    docker compose logs --tail 80 backend
+    throw "Backend가 ${TimeoutSeconds}초 안에 HTTP 요청 준비를 완료하지 못했습니다. 위 상태와 로그를 확인해주세요."
 }
 
 function Invoke-IntegratedAnalysis {
@@ -88,8 +107,13 @@ Push-Location $repoRoot
 try {
     Write-Host "[1/11] 필수 컨테이너와 Backend 추적 헤더 확인"
     $runningServices = @(docker compose ps --status running --services)
-    foreach ($service in $requiredServices) {
-        Assert-True ($runningServices -contains $service) "$service 컨테이너가 실행 중이 아닙니다."
+    $missingServices = @($requiredServices | Where-Object { $runningServices -notcontains $_ })
+    if ($missingServices.Count -gt 0) {
+        Write-Host "실행되지 않은 서비스: $($missingServices -join ', ')" -ForegroundColor Yellow
+        docker compose ps -a
+        Write-Host "최근 컨테이너 로그:" -ForegroundColor Yellow
+        docker compose logs --tail 80 database db-api ml-service sandbox multimodal-service page-ai-mock url-ai-mock backend
+        throw "필수 컨테이너가 실행 중이 아닙니다: $($missingServices -join ', ')"
     }
     $backendContainerId = docker compose ps -q backend
     $backendLogConfig = docker inspect --format '{{json .HostConfig.LogConfig}}' $backendContainerId | ConvertFrom-Json
@@ -104,7 +128,7 @@ try {
     Assert-True ($responseRequestId -eq $smokeRequestId) "X-Request-Id 응답 헤더가 요청값과 일치하지 않습니다. 실제 값: $responseRequestId"
 
     Write-Host "[2/11] Frontend HTTP 응답 확인"
-    $frontendResponse = Invoke-WebRequest -UseBasicParsing -Uri "http://localhost:$frontendPort/" -TimeoutSec 15
+    $frontendResponse = Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:$frontendPort/" -TimeoutSec 15
     Assert-True ($frontendResponse.StatusCode -eq 200) "Frontend가 HTTP 200을 반환하지 않았습니다."
 
     Write-Host "[3/11] 정상 URL 실제 통합 분석 및 DB 저장 확인"
@@ -185,7 +209,7 @@ try {
     Assert-True (-not [string]::IsNullOrWhiteSpace($blockedError.analysisId)) "차단 응답에 analysisId가 없습니다."
 
     Write-Host "[9/11] Gemini 설정 또는 DOM 규칙 기반 대체 분석 확인"
-    $multimodalHealth = Invoke-RestMethod -Uri "http://localhost:$multimodalPort/health" -TimeoutSec 15
+    $multimodalHealth = Invoke-RestMethod -Uri "http://127.0.0.1:$multimodalPort/health" -TimeoutSec 15
     if (-not $multimodalHealth.gemini_api_key_configured) {
         $ruleOnlyBody = @{
             analysisId = "smoke-rule-only"
@@ -203,7 +227,7 @@ try {
             network = @{}
             redirectChain = @()
         } | ConvertTo-Json -Depth 8
-        $ruleOnlyResult = Invoke-RestMethod -Uri "http://localhost:$multimodalPort/v1/analyze" -Method Post -ContentType "application/json" -Body $ruleOnlyBody -TimeoutSec 15
+        $ruleOnlyResult = Invoke-RestMethod -Uri "http://127.0.0.1:$multimodalPort/v1/analyze" -Method Post -ContentType "application/json" -Body $ruleOnlyBody -TimeoutSec 15
         Assert-True ($ruleOnlyResult.analysisId -eq "smoke-rule-only") "DOM 규칙 기반 분석의 analysisId가 일치하지 않습니다."
         Assert-True ($null -ne $ruleOnlyResult.pageRiskScore) "DOM 규칙 기반 위험 점수가 반환되지 않았습니다."
         Assert-True (@("NORMAL", "SUSPICIOUS", "PHISHING", "UNKNOWN") -contains $ruleOnlyResult.verdict) "DOM 규칙 기반 판정값이 올바르지 않습니다."
