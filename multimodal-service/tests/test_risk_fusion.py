@@ -75,6 +75,25 @@ def test_semantic_adjustment_is_bounded_both_directions():
     assert weak["detectedSignals"] == ["PASSWORD_FIELD"]
 
 
+def test_security_vendor_block_page_forces_phishing_with_no_other_signals():
+    # Regression for BUG-07: PhishTank-listed sites are often already taken
+    # down/blocked by their host, so the sandbox sees a harmless-looking
+    # warning page instead of the original credential-harvesting content.
+    # That third-party confirmation must still win, not read as NORMAL.
+    fused = result("cloudflare_block", semantic_result=semantic("LOW"))
+    assert fused["pageRiskScore"] >= 90 and fused["verdict"] == "PHISHING"
+    assert any("보안 업체" in reason for reason in fused["reasons"])
+
+
+def test_security_vendor_block_overrides_official_domain_safe_cap():
+    fused = result(
+        "official_bank", semantic_result=semantic("LOW"), final_url="https://obank.kbstar.com/",
+        title="Suspected Phishing | Cloudflare",
+        inputs=[{"type": "password", "label": "비밀번호"}],
+    )
+    assert fused["pageRiskScore"] >= 90 and fused["verdict"] == "PHISHING"
+
+
 def test_score_confidence_and_rule_facts_are_bounded_and_canonical():
     fused = result("fake_bank", semantic_result=semantic("HIGH", True))
     rule_domain = analyze_dom_risk(CASES["fake_bank"])["domainAnalysis"]

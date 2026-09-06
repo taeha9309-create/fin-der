@@ -28,5 +28,11 @@
   "download": {
     "final_url": "https://example.com/",
     "network": {"download_detected": true}
+  },
+  "cloudflare_block": {
+    "final_url": "https://bancaribe.pages.dev/",
+    "title": "Suspected Phishing | Cloudflare",
+    "page_text": "",
+    "forms": [{"method": "GET", "action": "https://bancaribe.pages.dev/cdn-cgi/phish-bypass"}]
   }
 }
