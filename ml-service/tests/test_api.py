@@ -23,12 +23,14 @@ class FakeModel:
 @pytest.mark.parametrize(
     ("probability", "label", "expected"),
     [
+        (0.10, "NORMAL", False),
         (0.20, "NORMAL", False),
+        (0.21, "NORMAL", True),
         (0.55, "SUSPICIOUS", True),
-        (0.85, "PHISHING", False),
+        (0.85, "PHISHING", True),
     ],
 )
-def test_only_suspicious_results_require_deep_analysis(
+def test_deep_analysis_required_above_safe_cutoff(
     probability: float, label: str, expected: bool
 ):
     with TestClient(app) as client:

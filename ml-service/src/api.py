@@ -45,9 +45,11 @@ def analyze(payload: AnalyzeRequest, request: Request) -> dict[str, object]:
         "risk_probability": round(result.probability, 6),
         "risk_score": risk_score,
         "label": result.label,
-        # Only uncertain stage-1 results need the expensive Sandbox/Multimodal path.
-        # NORMAL and PHISHING are final decisions at this stage.
-        "requires_deep_analysis": result.label == "SUSPICIOUS",
+        # Anything above the safe cutoff (<=20) goes through Sandbox/Multimodal,
+        # including high-confidence PHISHING calls — stage-1 URL features alone
+        # false-positive on legitimate long URLs (e.g. search engine result
+        # pages), so the visual/DOM check in stage 2 is needed up to score 100.
+        "requires_deep_analysis": risk_score > 20,
         "xai_reasons": result.reasons,
         "features": result.features,
         "model_version": result.model_version,
